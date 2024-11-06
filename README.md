@@ -4,6 +4,17 @@ The Markttransparenzstelle für Kraftstoffe (MTS-K) collects all gas station fue
 
 ## Scripts
 
+- Download dataset
+
+  ```bash
+  ./scripts/download.sh
+  ```
+
+  Downloads in `data/` 
+
+  - stations: 2024 stations data (all stations -> file is incrementally updated day after day)
+  - prices: 2024-04
+
 - Start CedarDB
 
   ```bash
