@@ -1,15 +1,16 @@
 #!/bin/bash
 CONTAINER_DIR=/datasets
-
 PG_CONN_STR="host=localhost dbname=client user=client password=client"
 
-SCHEMA="sql/schema/fuel_schema.sql"
+SCHEMA="sql/MTS-K_schema.sql"
 PRICES_TABLE=prices
 STATIONS_TABLE=stations
 
+CONTAINER=cedardb_runner
+PORT=5432
 
-
-
+postgres_container=postgres_runner
+postgres_port=54321
 
 do_create=false
 do_stations=false
@@ -17,26 +18,22 @@ do_prices=false
 prices_dir=""
 stations_dir=""
 
-# Function to display usage
 usage() {
-    echo "Usage: $0 <postgres|cedardb> [-c] [-p prices_dir] [-s stations_dir]"
+    echo "Usage: $0 [-c] [-p prices_dir] [-s stations_dir] [-r]"
     echo "  -c                create schema"
     echo "  -s stations_dir   load stations from stations_dir"
     echo "  -p prices_dir     load prices from prices_dir"
+    echo "  -r                use postgres -> container: $postgres_container | listening on $postgres_port "
     exit 1
 }
 
-if [[ -z "$1" || ( "$1" != "postgres" && "$1" != "cedardb" ) ]]; then
-    echo "Error: First argument must be either 'postgres' or 'cedardb'"
-    usage
-fi
-
-# Store the first argument and shift it, so getopts can process the remaining options
-container="db_$1"
-shift
+# if [[ -z "$1" || ( "$1" != "postgres" && "$1" != "cedardb" ) ]]; then
+#     echo "Error: First argument must be either 'postgres' or 'cedardb'"
+#     usage
+# fi
 
 # Parse command line options
-while getopts ":cp:s:" opt; do
+while getopts ":cp:s:r" opt; do
     case $opt in
         c)
             do_create=true
@@ -49,6 +46,15 @@ while getopts ":cp:s:" opt; do
             do_prices=true
             prices_dir="$OPTARG"
             ;;
+        r)
+            CONTAINER=$postgres_container
+            PORT=$postgres_port
+            echo "Using use postgres -> container: $postgres_container | listening on $postgres_port"
+            ;;
+        ?)
+            echo "Invalid option $opt"
+            usage
+            ;;
         *)
             usage
             ;;
@@ -57,18 +63,15 @@ done
 
 
 
-EXECUTOR=docker
+EXECUTOR=psql
 execute_query(){
   echo -e "Executing:\n$1"
   case $EXECUTOR in
     psql)
-        psql "$PG_CONN_STR" -c "$1"
+        psql "$PG_CONN_STR" -p $PORT -c "$1"
         ;;
     docker)
-        docker exec $container psql "$PG_CONN_STR" -c "$1"
-        ;;
-    python)
-        echo $1 | python client/runner.py
+        docker exec $CONTAINER psql "$PG_CONN_STR" -c "$1"
         ;;
   esac
   echo -e "\n"
@@ -77,7 +80,7 @@ execute_query(){
 
 #create schema---------------------------------
 if $do_create; then
-  execute_query "$(cat $SCHEMA)"
+  execute_query "$(cat $SCHEMA)" || exit 1
 fi
 
 #stations --------------------------------------
