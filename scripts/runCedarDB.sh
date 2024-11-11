@@ -19,3 +19,4 @@ sleep 2
 
 #initialize db if needed
 docker exec $container_name psql "$PG_CONN_STR" 2>/dev/null || docker exec $container_name psql -U postgres -f $CONTAINER_DIR/$INIT_DB 
+docker exec $container_name psql "$PG_CONN_STR" -c "set debug.verbosity='debug1';" #more logs from cedardb

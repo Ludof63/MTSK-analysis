@@ -1,6 +1,6 @@
 # MTS-K - Analysis with CedarDB
 
-The Markttransparenzstelle für Kraftstoffe (MTS-K) collects all gas station fuel prices all over Germany, the dataset is the collection of all the price changes. 
+The Markttransparenzstelle für Kraftstoffe (MTS-K) collects all gas station fuel prices all over Germany, the dataset is the collection of all the price changes (https://dev.azure.com/tankerkoenig/tankerkoenig-data). 
 
 ## Scripts
 
@@ -34,7 +34,7 @@ The Markttransparenzstelle für Kraftstoffe (MTS-K) collects all gas station fue
 - Load MTS-K (all stations  + April price changes)
 
   ```bash
-  ./scripts/loadMTS-K.sh -c -s data/stations -p data/prices/2024/04
+  ./scripts/loadMTS-K.sh -c -s data/stations -p data/prices
   ```
 
   `-c` creates the MTS-K schema,  `-s` loads the stations, `-p` loads the prices
