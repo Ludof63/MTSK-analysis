@@ -3,24 +3,87 @@
 #https://dev.azure.com/tankerkoenig/tankerkoenig-data/_git/tankerkoenig-data
 org=tankerkoenig
 repo=tankerkoenig-data
-data_folder=data
 
-#stations 2024
-stations_subfolder="/stations/2024"
-station_out="${data_folder}/stations"
+#latest stations file
+station_file="$(date --date="yesterday" "+%Y-%m-%d")-stations.csv"
+station_path="stations/$(date --date="yesterday" "+%Y/%m")/${station_file}"
+file_station_out="stations.csv"
 
-#prices 2024-04
-prices_subfolder="/prices/2024/04"
-prices_out="${data_folder}/prices"
+#prices to download
+start_date="2024/04"
+end_date="2024/11"
+folder_prices_out="prices"
 
 
-set -x
+#https://www.suche-postleitzahl.org/downloads
+base_url="https://downloads.suche-postleitzahl.org/v2/public"
+plz_info="zuordnung_plz_ort.csv"
+plz_5stellig="plz-5stellig.shp.zip"
+
+
+
+# -------------------------------------------------
+download_stations=false
+download_prices=false
+download_regions=false
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <data_folder> [-s] [-p] [-r]"
+    exit 1
+fi
+data_folder=$1
+shift 
+
+while getopts "spr" opt; do
+    case "$opt" in
+        s) download_stations=true ;;
+        p) download_prices=true ;;
+        r) download_regions=true ;;
+        *) 
+            echo "Invalid option: -$OPTARG"
+            exit 1
+            ;;
+    esac
+done
+
+
+
+set +x
 mkdir -p $data_folder
 
-stations_url="https://dev.azure.com/${org}/${repo}/_apis/git/repositories/${repo}/items?path=${stations_subfolder}&%24format=zip"
-curl -L -o ${station_out}.zip $stations_url
-unzip -q ${station_out}.zip -d $station_out
+if $download_stations; then
+    curl -L -o "${data_folder}/${file_station_out}" "https://dev.azure.com/${org}/${repo}/_apis/git/repositories/${repo}/items?path=${station_path}"
+fi
 
-prices_url="https://dev.azure.com/${org}/${repo}/_apis/git/repositories/${repo}/items?path=${prices_subfolder}&%24format=zip"
-curl -L -o ${prices_out}.zip $prices_url
-unzip -q ${prices_out}.zip -d $prices_out
+if $download_prices; then
+    prices_folder="${data_folder}/${folder_prices_out}"
+    mkdir -p $prices_folder
+
+    current_date="$start_date"
+    end_date_month=$(date -d "$end_date/01" "+%Y/%m")
+
+    while [[ "$current_date" < "$end_date_month" ]]; do
+        filename="prices_$(echo "$current_date" | sed 's/\//_/').zip"
+        echo "Downloading prices for $current_date in $filename"
+
+        year_folder="$prices_folder/$(date -d "$current_date/01" "+%Y")"
+
+        prices_url="https://dev.azure.com/${org}/${repo}/_apis/git/repositories/${repo}/items?path=prices/${current_date}&%24format=zip"
+
+        set -x
+        mkdir -p $year_folder        
+        curl -L -o "${data_folder}/${folder_prices_out}/${filename}" $prices_url
+        unzip -q "${data_folder}/${folder_prices_out}/${filename}" -d $year_folder
+        set +x
+
+        current_date=$(date -d "$current_date/01 + 1 month" +%Y/%m)
+    done
+
+    
+fi
+
+if $download_regions; then
+    curl -L -o "${data_folder}/${plz_info}" "${base_url}/${plz_info}"
+    # curl -L -o "${data_folder}/${plz_5stellig}" "${base_url}/${plz_5stellig}" 
+    # unzip -q "${data_folder}/${plz_5stellig}" -d "${data_folder}/${plz_5stellig%.zip}"
+fi
