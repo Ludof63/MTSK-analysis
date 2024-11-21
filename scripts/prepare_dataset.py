@@ -56,7 +56,7 @@ def query_location(lat: float, lon:float) -> tuple[str,str] | None:
 
 
                 
-AVOID_STR= ["please delete - bitte loeschen", "Nicht", "mehr aktiv", "", "gelöscht", "Hh Admi-Testkasse", "12345"]
+
 
 RowType : TypeAlias =  dict[str | Any, str | Any]
 
@@ -88,14 +88,13 @@ def find_best_match(city : str, possible_cities : list[str]) -> tuple[str, float
     return closest_c, Levenshtein.distance(city.title(),closest_c)
 
 
+AVOID_STR= ["please delete - bitte loeschen", "Nicht", "mehr aktiv", "", "gelöscht", "Hh Admi-Testkasse", "12345"]
 def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
     
     #use official dataset
     plz_to_cities : dict[str, list[str]] = {}
     with open(plz_region_file, 'r') as input_plz_to_city:
             reader_plz_city = csv.DictReader(input_plz_to_city)  
-
-            print(reader_plz_city.fieldnames)
             for row in reader_plz_city:
                 plz = row['plz']
                 city = row['ort']
@@ -106,8 +105,7 @@ def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
                 else:
                     plz_to_cities[plz] = [city]
 
-    #os.path.join(input_folder,zuordnung_file)
-
+    removed = []
     with open(output,'w+') as outfile:
         writer = csv.DictWriter(outfile, fieldnames=columns_to_keep)
         writer.writeheader()
@@ -120,15 +118,17 @@ def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
                 plz = row['post_code']
                 city = row['city']
 
-                if plz in AVOID_STR or city in AVOID_STR:
+                if not plz.isdigit() or plz in ['12345', '00000']:
+                    print(f"Skipping {to_str(row)}")
                     continue
+                    
 
                 if len(plz) < 5:
                     plz = "0"*(5-len(plz)) + plz
 
                 if plz in plz_to_cities: #valid post_code
                     if len(plz_to_cities[plz]) == 1: 
-                        row['city'] = plz_to_cities[plz][0] #only once city with that postcode
+                        row['city'] = plz_to_cities[plz][0] #only one city with that postcode
                     else:
                         #try to find a city name (but not important -> cannot be used in aggregations)
                         match,dst = find_best_match(city,plz_to_cities[plz])
@@ -139,29 +139,32 @@ def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
 
                 else:
                     invalid_plz_unknown_city.append(filter_row(row))
-                
+       
+              
 
         not_good : list[RowType] =[]
-        print(f"\ntrying to correct cities with invalid plz: {len(invalid_plz_unknown_city)}")
+        print(f"\n{len(invalid_plz_unknown_city)} cities with invalid plz:")
         for s in invalid_plz_unknown_city:
-            print(f"\n{to_str(s)}")
+            print(f"Trying to fix: {to_str(s)}")
             match = query_location(float(s['latitude']),float(s['longitude']))
             if match:
-                print(f"FOUND: {match[0]}, {match[1]} for {s['post_code']}, {s['city']}")
+                print(f"\tFOUND: {match[0]}, {match[1]} for {s['post_code']}, {s['city']}")
                 s['post_code'] = match[0]
                 s['city'] = match[1]
-                writer.writerow(filter_row(row))
+                writer.writerow(filter_row(s))
             else:
-                print(f"NOT FOUND: for {s['post_code']}, {s['city']}")
+                print(f"\tNOT FOUND: for {s['post_code']}, {s['city']}")
                 not_good.append(s)
     
-        print(f"\nSTILL PROBLEMS: {len(not_good)}")
-        for s in not_good:
-            print(to_str(s)) 
+        if len(not_good) == 0:
+            print("OK")
+        else:
+            print(f"\nSTILL PROBLEMS: {len(not_good)}")
+            for s in not_good:
+                print(to_str(s)) 
     
 
 def generate_region(plz_region_file : str, output_file : str):
-
     new_mapping: dict[str,str] = {'post_code' : 'plz', 'cities' : 'ort', 'landkreis' : 'landkreis', 'bundesland' : 'bundesland' }
     with open(plz_region_file, 'r') as input, open(output_file,'w+') as outfile:
         reader = csv.DictReader(input)  
@@ -172,6 +175,22 @@ def generate_region(plz_region_file : str, output_file : str):
         for row in reader:
             writer.writerow({new_key : row.get(old_key, '') for new_key,old_key in new_mapping.items()})
 
+
+station_old="../data/stations-old.csv"
+
+with open(get_real_path(STATION_INPUT),'r') as newfile, open(get_real_path(station_old),'r') as oldfile:
+    reader_new = csv.DictReader(newfile) 
+    reader_old = csv.DictReader(oldfile)
+
+    uuid_new = set()
+    for row in reader_new:
+        uuid_new.add(row['uuid'])
+
+    uuid_old = set()
+    for row in reader_old:
+        uuid_old.add(row['uuid'])
+    
+    assert uuid_new.issuperset(uuid_old)
 
 
 clear_stations(get_real_path(PLZ_REGION_FILE),get_real_path(STATION_INPUT),get_real_path(STATION_OUTPUT))

@@ -4,14 +4,18 @@
 org=tankerkoenig
 repo=tankerkoenig-data
 
-#latest stations file
-station_file="$(date --date="yesterday" "+%Y-%m-%d")-stations.csv"
-station_path="stations/$(date --date="yesterday" "+%Y/%m")/${station_file}"
+
+
+
+date_station_file="$(date --date="yesterday" "+%Y-%m-%d")" #latest stations file
+#date_station_file="2024-11-01" 
+station_file="${date_station_file}-stations.csv" 
+station_path="stations/$(date -d "$date_station_file" "+%Y/%m")/${station_file}"
 file_station_out="stations.csv"
 
 #prices to download
 start_date="2024/04"
-end_date="2024/11"
+end_date="2024/06"
 folder_prices_out="prices"
 
 

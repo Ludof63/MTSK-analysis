@@ -1,5 +1,6 @@
 drop table if exists prices;
 drop table if exists stations;
+drop table if exists regions;
 
 create table stations (
     id uuid primary key,
@@ -23,4 +24,13 @@ create table prices(
     e5_change smallint not null,
     e10_change smallint not null,
     primary key(station_uuid,time)
+);
+
+
+create table regions (
+    post_code text not null,    
+    cities text not null,        
+    landkreis text,   
+    bundesland text NOT NULL, 
+    unique(post_code,cities,landkreis)               
 );
