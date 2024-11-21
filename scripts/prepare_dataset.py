@@ -1,10 +1,8 @@
 import csv
 import os
 from typing import Any, TypeAlias
-import Levenshtein
 import requests
 import random
-import pandas as pd
 
 DATA_FOLDER="../data/"
 PLZ_REGION_FILE=os.path.join(DATA_FOLDER,"zuordnung_plz_ort.csv")
@@ -72,20 +70,19 @@ def to_str(row : RowType) -> str:
 
 
 
-def find_best_match(city : str, possible_cities : list[str]) -> tuple[str, float]:
+def find_best_match(city : str, possible_cities : list[str]) -> str | None:
     def normalize_split(city_str : str):
         s = set(city_str.title().replace("-", " ").replace("/", " ").replace("ß", "ss").replace("ö", "oe").replace("ä", "ae").replace("ü","ue").split())
-        return {word for word in s if len(word) >= 4}
+        return {word for word in s if len(word) >= 3}
     
     targets = normalize_split(city)
     for possible_city in possible_cities:
         possible_substrings = normalize_split(possible_city)
 
         if targets & possible_substrings:
-            return possible_city,0
-        
-    closest_c = min(possible_cities, key=lambda k: Levenshtein.distance(city.title(), k))
-    return closest_c, Levenshtein.distance(city.title(),closest_c)
+            return possible_city
+    
+    return None
 
 
 AVOID_STR= ["please delete - bitte loeschen", "Nicht", "mehr aktiv", "", "gelöscht", "Hh Admi-Testkasse", "12345"]
@@ -106,6 +103,7 @@ def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
                     plz_to_cities[plz] = [city]
 
     removed = []
+    fixed = 0
     with open(output,'w+') as outfile:
         writer = csv.DictWriter(outfile, fieldnames=columns_to_keep)
         writer.writeheader()
@@ -131,8 +129,8 @@ def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
                         row['city'] = plz_to_cities[plz][0] #only one city with that postcode
                     else:
                         #try to find a city name (but not important -> cannot be used in aggregations)
-                        match,dst = find_best_match(city,plz_to_cities[plz])
-                        if dst <= 0.2:
+                        match = find_best_match(city,plz_to_cities[plz])
+                        if match:
                             row['city'] = match
 
                     writer.writerow(filter_row(row))
