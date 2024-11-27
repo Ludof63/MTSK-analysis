@@ -1,47 +1,74 @@
 # MTS-K - Analysis with CedarDB
 
-The Markttransparenzstelle für Kraftstoffe (MTS-K) collects all gas station fuel prices all over Germany, the dataset is the collection of all the price changes (https://dev.azure.com/tankerkoenig/tankerkoenig-data). 
+The Markttransparenzstelle für Kraftstoffe (MTS-K) collects all gas station fuel prices all over Germany, the dataset is the collection of all the price changes (https://dev.azure.com/tankerkoenig/tankerkoenig-data).  Additionally we use the https://www.suche-postleitzahl.org/downloads to "fix" the stations dataset and to get map information.
 
-## Scripts
+## Getting Started with MTS-K analysis
 
-- Download dataset
-
-  ```bash
-  ./scripts/download.sh
-  ```
-
-  Downloads in `data/` 
-
-  - stations: 2024 stations data (all stations -> file is incrementally updated day after day)
-  - prices: 2024-04
-
-- Start CedarDB
+1. Download datasets (everything)
 
   ```bash
-  ./scripts/runCedarDB.sh
+  ./scripts/download.sh data -s -r -p
   ```
 
-  Starts CedarDB with docker (image `cedardb`) on port `5432`
+  `./scripts/download.sh <data_folder> [-s] [-p] [-r]` automatize the download of different datasets. 
 
-- Start Postgres
+  - It saves the downloaded files in `data_folder`
+  - `-s` to download the latest [stations](https://dev.azure.com/tankerkoenig/tankerkoenig-data/_git/tankerkoenig-data?path=/stations)  data
+  - `-r`  to download latest  [Germany regions](https://www.suche-postleitzahl.org/downloads)
+  - `-p` to download the [prices](https://dev.azure.com/tankerkoenig/tankerkoenig-data/_git/tankerkoenig-data?path=/prices) (default from 2024/04  to 2024/06) 
+
+2. Prepare dataset
 
   ```bash
-  ./scripts/runPostgres.sh
+  python scripts/prepare_dataset.py data/stations.csv data/zuordnung_plz_ort.csv
   ```
 
-  Starts Postgres with docker (image `postgres`) on port `54321`
+  Stations and regions data have to be prepared (to execute COPY FROM directly in their respective tables). The above command is an invocation of `scripts/prepare_dataset.py <station_file> <region_file> [-c (--clean)]` with the default file names in the folder `data`. 
 
-- Load MTS-K (all stations  + April price changes)
+  > The flag `-c` can be specified to "fix" the stations dataset. In the original stations dataset `post_code` informations are not reliable, the script attempts to fix them by querying [OpenStreeMap](https://nominatim.openstreetmap.org/ui/search.html) for "wrong" stations coordinates.
+
+3. Start CedarDB with preloaded dataset
 
   ```bash
-  ./scripts/loadMTS-K.sh -c -s data/stations -p data/prices
+  docker-compose up --build -d
   ```
 
-  `-c` creates the MTS-K schema,  `-s` loads the stations, `-p` loads the prices
+  Starts CedarDB using a custom CedarDB docker image that preloads the dataset (downloaded and prepared). The configuration of the container can be found in `.env`
 
-  `-r` can be specified to use Postgres (instead of CedarDB)
+  The initialization of the db is done via the script `scripts/load.sh` that in custom image is copied in `/docker-entrypoint-initdb.d/`
 
-- Start Grafana
+  > The docker-compose configuration makes the database persistent, if you want a clean restart, run `./script/clean_restart.sh`
+
+4. Connect to CedarDB and run queries
+
+  You can connect to CedarDB and run queries as you would do with Postgres. Using the default configuration in `.env` :
+
+  - Using psql
+
+    ```bash
+    psql 'host=localhost user=client dbname=client password=client'
+    ```
+
+  - Using docker
+
+    ```bash
+    docker exec -it cedardb_runner psql ' user=client dbname=client password=client'
+    ```
+
+5. Stop CedarDB
+
+  ```bash
+  docker-compose down
+  ```
+
+
+## Additional utilities
+
+- Custom Dataset Loading
+
+- Run Postgres
+
+- Run Grafana 
 
   ```bash
   ./scripts/runGrafana.sh

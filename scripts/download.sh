@@ -5,8 +5,6 @@ org=tankerkoenig
 repo=tankerkoenig-data
 
 
-
-
 date_station_file="$(date --date="yesterday" "+%Y-%m-%d")" #latest stations file
 #date_station_file="2024-11-01" 
 station_file="${date_station_file}-stations.csv" 
@@ -32,7 +30,7 @@ download_prices=false
 download_regions=false
 
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 <data_folder> [-s] [-p] [-r]"
+    echo "Usage: $0 <data_folder> [-s]  [-r] [-p]"
     exit 1
 fi
 data_folder=$1
@@ -41,8 +39,8 @@ shift
 while getopts "spr" opt; do
     case "$opt" in
         s) download_stations=true ;;
-        p) download_prices=true ;;
         r) download_regions=true ;;
+        p) download_prices=true ;;
         *) 
             echo "Invalid option: -$OPTARG"
             exit 1
@@ -59,12 +57,21 @@ if $download_stations; then
     curl -L -o "${data_folder}/${file_station_out}" "https://dev.azure.com/${org}/${repo}/_apis/git/repositories/${repo}/items?path=${station_path}"
 fi
 
+
+if $download_regions; then
+    curl -L -o "${data_folder}/${plz_info}" "${base_url}/${plz_info}"
+    # curl -L -o "${data_folder}/${plz_5stellig}" "${base_url}/${plz_5stellig}" 
+    # unzip -q "${data_folder}/${plz_5stellig}" -d "${data_folder}/${plz_5stellig%.zip}"
+fi
+
+
 if $download_prices; then
     prices_folder="${data_folder}/${folder_prices_out}"
     mkdir -p $prices_folder
 
     current_date="$start_date"
-    end_date_month=$(date -d "$end_date/01" "+%Y/%m")
+    end_date_month=$(date -d "$end_date/01 + 1 month" "+%Y/%m")
+    echo $end_date_month
 
     while [[ "$current_date" < "$end_date_month" ]]; do
         filename="prices_$(echo "$current_date" | sed 's/\//_/').zip"
@@ -77,7 +84,7 @@ if $download_prices; then
         set -x
         mkdir -p $year_folder        
         curl -L -o "${data_folder}/${folder_prices_out}/${filename}" $prices_url
-        unzip -q "${data_folder}/${folder_prices_out}/${filename}" -d $year_folder
+        unzip -qo "${data_folder}/${folder_prices_out}/${filename}" -d $year_folder
         set +x
 
         current_date=$(date -d "$current_date/01 + 1 month" +%Y/%m)
@@ -86,8 +93,4 @@ if $download_prices; then
     
 fi
 
-if $download_regions; then
-    curl -L -o "${data_folder}/${plz_info}" "${base_url}/${plz_info}"
-    # curl -L -o "${data_folder}/${plz_5stellig}" "${base_url}/${plz_5stellig}" 
-    # unzip -q "${data_folder}/${plz_5stellig}" -d "${data_folder}/${plz_5stellig%.zip}"
-fi
+

@@ -3,14 +3,8 @@ import os
 from typing import Any, TypeAlias
 import requests
 import random
+import argparse
 
-DATA_FOLDER="../data/"
-PLZ_REGION_FILE=os.path.join(DATA_FOLDER,"zuordnung_plz_ort.csv")
-STELLIG_FILE= os.path.join(DATA_FOLDER,"plz-5stellig.shp")
-STATION_INPUT= os.path.join(DATA_FOLDER,"stations.csv")
-
-STATION_OUTPUT=os.path.join(DATA_FOLDER,"stations_official.csv")
-REGIONS_OUTPUT=os.path.join(DATA_FOLDER,"germany_regions.csv")
 
 def get_real_path(relative_path : str) -> str:
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -86,9 +80,21 @@ def find_best_match(city : str, possible_cities : list[str]) -> str | None:
 
 
 AVOID_STR= ["please delete - bitte loeschen", "Nicht", "mehr aktiv", "", "gelöscht", "Hh Admi-Testkasse", "12345"]
-def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
-    
-    #use official dataset
+def prepare_stations(plz_region_file : str, stations_dataset :str, output :str, just_trim : bool = True):
+
+    if just_trim:
+        with open(output,'w+') as outfile, open(stations_dataset, mode='r', newline='') as infile:
+            writer = csv.DictWriter(outfile, fieldnames=columns_to_keep) 
+            reader = csv.DictReader(infile) 
+
+            writer.writeheader()
+            for row in reader:
+                writer.writerow(filter_row(row))
+            
+        return 
+
+
+    #use official dataset of Germany's regions
     plz_to_cities : dict[str, list[str]] = {}
     with open(plz_region_file, 'r') as input_plz_to_city:
             reader_plz_city = csv.DictReader(input_plz_to_city)  
@@ -102,41 +108,38 @@ def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
                 else:
                     plz_to_cities[plz] = [city]
 
-    removed = []
-    fixed = 0
-    with open(output,'w+') as outfile:
+
+    with open(output,'w+') as outfile, open(stations_dataset, mode='r', newline='') as infile:
         writer = csv.DictWriter(outfile, fieldnames=columns_to_keep)
         writer.writeheader()
 
         invalid_plz_unknown_city : list[RowType] = [] 
-    
-        with open(stations_dataset, mode='r', newline='') as infile:
-            reader = csv.DictReader(infile) 
-            for row in reader:
-                plz = row['post_code']
-                city = row['city']
+        reader = csv.DictReader(infile) 
+        for row in reader:
+            plz = row['post_code']
+            city = row['city']
 
-                if not plz.isdigit() or plz in ['12345', '00000']:
-                    print(f"Skipping {to_str(row)}")
-                    continue
-                    
+            if not plz.isdigit() or plz in ['12345', '00000']:
+                print(f"Skipping {to_str(row)}")
+                continue
+                
 
-                if len(plz) < 5:
-                    plz = "0"*(5-len(plz)) + plz
+            if len(plz) < 5:
+                plz = "0"*(5-len(plz)) + plz
 
-                if plz in plz_to_cities: #valid post_code
-                    if len(plz_to_cities[plz]) == 1: 
-                        row['city'] = plz_to_cities[plz][0] #only one city with that postcode
-                    else:
-                        #try to find a city name (but not important -> cannot be used in aggregations)
-                        match = find_best_match(city,plz_to_cities[plz])
-                        if match:
-                            row['city'] = match
-
-                    writer.writerow(filter_row(row))
-
+            if plz in plz_to_cities: #valid post_code
+                if len(plz_to_cities[plz]) == 1: 
+                    row['city'] = plz_to_cities[plz][0] #only one city with that postcode
                 else:
-                    invalid_plz_unknown_city.append(filter_row(row))
+                    #try to find a city name (but not important -> cannot be used in aggregations)
+                    match = find_best_match(city,plz_to_cities[plz])
+                    if match:
+                        row['city'] = match
+
+                writer.writerow(filter_row(row))
+
+            else:
+                invalid_plz_unknown_city.append(filter_row(row))
        
               
 
@@ -162,7 +165,7 @@ def clear_stations(plz_region_file : str, stations_dataset :str, output :str):
                 print(to_str(s)) 
     
 
-def generate_region(plz_region_file : str, output_file : str):
+def prepare_regions(plz_region_file : str, output_file : str):
     new_mapping: dict[str,str] = {'post_code' : 'plz', 'cities' : 'ort', 'landkreis' : 'landkreis', 'bundesland' : 'bundesland' }
     with open(plz_region_file, 'r') as input, open(output_file,'w+') as outfile:
         reader = csv.DictReader(input)  
@@ -174,22 +177,25 @@ def generate_region(plz_region_file : str, output_file : str):
             writer.writerow({new_key : row.get(old_key, '') for new_key,old_key in new_mapping.items()})
 
 
-station_old="../data/stations-old.csv"
 
-with open(get_real_path(STATION_INPUT),'r') as newfile, open(get_real_path(station_old),'r') as oldfile:
-    reader_new = csv.DictReader(newfile) 
-    reader_old = csv.DictReader(oldfile)
+REGIONS_OUTPUT="regions_ready.csv"
+STATION_OUTPUT="stations_ready.csv"
 
-    uuid_new = set()
-    for row in reader_new:
-        uuid_new.add(row['uuid'])
-
-    uuid_old = set()
-    for row in reader_old:
-        uuid_old.add(row['uuid'])
+def main():
+    parser = argparse.ArgumentParser(description="Usage: <station_file> <region_file> [-c (--clean)]")
+    parser.add_argument('station_file', type=str, help="station input file")
+    parser.add_argument('region_file', type=str, help="region input file")
+    parser.add_argument('-c', '--clean', action='store_true', help="Execute stations cleaning (otherwise only trimming)")
+    args = parser.parse_args()
+    just_trim = not args.clean 
     
-    assert uuid_new.issuperset(uuid_old)
+    
+    prepare_regions(args.region_file,os.path.join(os.path.dirname(args.region_file),REGIONS_OUTPUT))
+    print(f'Regions dataset ready in {REGIONS_OUTPUT}')
+    
+    prepare_stations(args.region_file,args.station_file,os.path.join(os.path.dirname(args.station_file),STATION_OUTPUT),just_trim)
+    print(f'Regions dataset ready {"(and cleared)" if not just_trim else ""} in {STATION_OUTPUT}')
+    
 
-
-clear_stations(get_real_path(PLZ_REGION_FILE),get_real_path(STATION_INPUT),get_real_path(STATION_OUTPUT))
-generate_region(get_real_path(PLZ_REGION_FILE),get_real_path(REGIONS_OUTPUT))
+if __name__ == "__main__":
+    main()
