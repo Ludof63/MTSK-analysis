@@ -11,10 +11,11 @@ create table stations (
     post_code text,
     city text,
     latitude double precision not null,
-    longitude double precision not null
+    longitude double precision not null,
+    s2_cell_id bigint not null
 );
 
-create table prices(
+create table prices (
     time timestamp not null,
     station_uuid uuid,
     diesel numeric(5,3) not null,
@@ -23,7 +24,7 @@ create table prices(
     diesel_change smallint not null,
     e5_change smallint not null,
     e10_change smallint not null,
-    primary key(station_uuid,time)
+    primary key(station_uuid,time) 
 );
 
 

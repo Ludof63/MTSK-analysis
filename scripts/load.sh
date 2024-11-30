@@ -19,3 +19,6 @@ find "$DATA_FOLDER/$PRICES_FOLDER" -type f -name "*-prices.csv" | sort | while r
     query="copy $PRICES_TABLE from '$file' with(format csv, delimiter ',', null '', header true);"
     execute_query "$query"
 done
+
+
+#set debug.verbosity='debug1';

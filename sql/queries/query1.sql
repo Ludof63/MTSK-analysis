@@ -74,3 +74,14 @@ left join
 	diesel_data.city = e10_data.city
 order by
 	n_stations desc;
+
+
+
+SELECT
+	FLOOR(s2_cell_id / 1000) AS cluster_id,
+	COUNT(*) AS station_count
+FROM stations
+GROUP BY cluster_id;
+
+
+
