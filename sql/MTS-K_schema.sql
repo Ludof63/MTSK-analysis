@@ -1,6 +1,6 @@
 drop table if exists prices;
 drop table if exists stations;
-drop table if exists regions;
+drop table if exists stations_clusters;
 
 create table stations (
     id uuid primary key,
@@ -12,7 +12,7 @@ create table stations (
     city text,
     latitude double precision not null,
     longitude double precision not null,
-    s2_cell_id bigint not null
+    always_open boolean not null
 );
 
 create table prices (
@@ -24,14 +24,12 @@ create table prices (
     diesel_change smallint not null,
     e5_change smallint not null,
     e10_change smallint not null,
-    primary key(station_uuid,time) 
+   
+    -- primary key(station_uuid,time) 
 );
 
-
-create table regions (
-    post_code text not null,    
-    cities text not null,        
-    landkreis text,   
-    bundesland text NOT NULL, 
-    unique(post_code,cities,landkreis)               
+create table stations_clusters (
+    stations_id uuid not null,    
+    cluster text not null,        
+    primary key(post_code,cities,landkreis)               
 );

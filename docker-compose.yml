@@ -7,13 +7,12 @@ services:
     ports:
       - "5432:5432"                   
     env_file:
-      - .env                          
-    logging:
-      driver: journald              
+      - .env                                       
     volumes:
       - ./data:/data
       - ./sql:/sql                  
       - cedardb_data:/var/lib/cedardb/data                  
 
 volumes:
-  cedardb_data:                       
+  cedardb_data:
+    name: cedardb_data                   

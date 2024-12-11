@@ -1,21 +1,24 @@
 #!/bin/bash
-CONTAINER_DIR=/datasets
-IMAGE=postgres
+#RUN IN THE ROOT OF THE PROJECT
+
 PORT=54321
+CONTAINER_NAME=postgres_runner
+ENV_FILE=.env 
+VOLUME_NAME=postgres_data
 
-INIT_DB=sql/initdb.sql  
-PG_CONN_STR="host=localhost dbname=client user=client password=client"
 
-volume="${IMAGE}_data"
-container_name="${IMAGE}_runner"
+source $ENV_FILE
 
-set -x  #log everything
+set -x
+docker run -d --rm \
+  --name $CONTAINER_NAME \
+  -p $PORT:5432 \
+  -e POSTGRES_USER=$CEDAR_USER \
+  -e POSTGRES_PASSWORD=$CEDAR_PASSWORD \
+  -e POSTGRES_DB=$CEDAR_DB \
+  -v ./data:$DATA_FOLDER \
+  -v ./sql:$SQL_FOLDER \
+  -v $VOLUME_NAME:/var/lib/postgresql/data \
+  postgres:latest
 
-docker stop $container_name
-docker volume create $volume
 
-docker run -d --rm  -p $PORT:5432 --log-driver=journald -e POSTGRES_PASSWORD=nopswd -v .:$CONTAINER_DIR -v $volume:/var/lib/postgresql/data  --name=$container_name $IMAGE 
-sleep 2
-
-#initialize db if needed
-docker exec $container_name psql "$PG_CONN_STR" 2>/dev/null || docker exec $container_name psql -U postgres -f $CONTAINER_DIR/$INIT_DB 

@@ -15,7 +15,7 @@ postgres_container=postgres_runner
 do_create=0
 do_stations=0
 do_prices=0
-do_regions=0
+do_clusters=0
 prices_dir=""
 
 usage() {
@@ -23,7 +23,7 @@ usage() {
     echo "  -c              create schema ($PATH_TO_SQL_FOLDER/$SCHEMA_FILE)"
     echo "  -p prices_dir   load prices from prices_dir in $PATH_TO_DATA_FOLDER "
     echo "  -s              load stations from $PATH_TO_DATA_FOLDER/$STATION_FILE "
-    echo "  -r              load regions from $PATH_TO_DATA_FOLDER/$REGION_FILE"
+    echo "  -c              load clusters from $PATH_TO_DATA_FOLDER/$CLUSTER_FILE"
     echo "  -o              use postgres -> container: $postgres_container"
     exit 1
 }
@@ -42,7 +42,7 @@ while getopts ":cp:sro" opt; do
             prices_dir="$OPTARG"
             ;;
         r)
-            do_regions=1
+            do_clusters=1
             ;;
         o)
             CONTAINER=$postgres_container
@@ -110,13 +110,13 @@ if [[ "$do_stations" -eq 1 ]]; then
 fi
 
 
-#regions ----------------------------------------
-if [[ "$do_regions" -eq 1 ]]; then
+#clusters ----------------------------------------
+if [[ "$do_clusters" -eq 1 ]]; then
     if [[ "$do_create" -eq 0 ]]; then
-        execute_query "drop table if exists $REGION_TABLE;"
-        execute_query "$(extract_create_table "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE" $REGION_TABLE)"
+        execute_query "drop table if exists $CLUSTERS_TABLE;"
+        execute_query "$(extract_create_table "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE" $CLUSTERS_TABLE)"
     fi
     
-    execute_query "copy $REGION_TABLE from '$DATA_FOLDER/$REGION_FILE' with(format csv, delimiter ',', null '', header true);"
+    execute_query "copy $CLUSTERS_TABLE from '$DATA_FOLDER/$CLUSTERS_FILE' with(format csv, delimiter ',', null '', header true);"
     
 fi

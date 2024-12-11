@@ -77,11 +77,3 @@ order by
 
 
 
-SELECT
-	FLOOR(s2_cell_id / 1000) AS cluster_id,
-	COUNT(*) AS station_count
-FROM stations
-GROUP BY cluster_id;
-
-
-

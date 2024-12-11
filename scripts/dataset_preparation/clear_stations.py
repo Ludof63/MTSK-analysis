@@ -4,8 +4,9 @@ from typing import Any, TypeAlias
 import requests
 import random
 import argparse
+import json
 
-LEVEL = 16
+LEVEL = 10
 
 def get_real_path(relative_path : str) -> str:
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -24,6 +25,7 @@ def is_point_in_germany(row : RowType):
 
 
 
+#---------------------------------------------------------------------------------
 def query_osm(api_type : str, params : dict[str,Any]) -> Any | Exception:
     url = f"https://nominatim.openstreetmap.org/{api_type}"
     user = random.choice(["pippo", "pluto", "paperino"])
@@ -96,17 +98,20 @@ def query_for_coordinates(post_code : str, street : str) -> tuple[float, float] 
     else:
         return None
     
+#---------------------------------------------------------------------------------
+
 
 columns_to_keep = ['uuid', 'name', 'brand', 'street', 'house_number', 'post_code', 'city', 'latitude', 'longitude']
-stations_header = columns_to_keep + ["s2_cell_id"]
+stations_header = columns_to_keep + ['always_open']
 
-def filter_row(row : RowType, compute_s2 : bool) -> RowType:
+def filter_row(row : RowType) -> RowType:
     filter_row = {key : row.get(key, '') for key in columns_to_keep}
-    if compute_s2:
-        import s2sphere
-        filter_row['s2_cell_id'] = s2sphere.CellId.from_lat_lng(s2sphere.LatLng.from_degrees(float(row['latitude']),float(row['longitude']))).parent(LEVEL).id()
+    times = json.loads(row['openingtimes_json'])
+    assert(isinstance(times, dict))
+    if not times:
+        filter_row['always_open'] = 'true'
     else:
-        filter_row['s2_cell_id'] = '0'
+        filter_row['always_open'] = 'false'
     return filter_row
     
 
@@ -139,17 +144,19 @@ def find_best_match(city : str, possible_cities : list[str]) -> str | None:
 
 AVOID_STR= ["please delete - bitte loeschen", "Nicht", "mehr aktiv", "", "gelöscht", "Hh Admi-Testkasse", "12345"]
 
-def prepare_stations(plz_region_file : str, stations_dataset :str, output :str, just_trim : bool, compute_s2 : bool):
+def prepare_stations(plz_region_file : str, stations_dataset :str, output :str):
     tmp_out_file = 'data_temp.csv'
 
+    just_trim = False
     if just_trim:
         with open(tmp_out_file,'w+') as outfile, open(stations_dataset, mode='r', newline='') as infile:
             writer = csv.DictWriter(outfile, fieldnames=stations_header) 
             reader = csv.DictReader(infile) 
-
             writer.writeheader()
+        
             for row in reader:
-                writer.writerow(filter_row(row,compute_s2))
+                writer.writerow(filter_row(row))
+
 
         os.replace(tmp_out_file,output)
         return 
@@ -203,7 +210,7 @@ def prepare_stations(plz_region_file : str, stations_dataset :str, output :str, 
                         row['city'] = match
                 
                 if valid_coords:
-                    writer.writerow(filter_row(row,compute_s2))
+                    writer.writerow(filter_row(row))
                 else:
                     invalid_coord.append(row)
 
@@ -226,7 +233,7 @@ def prepare_stations(plz_region_file : str, stations_dataset :str, output :str, 
             if match:
                 print(f"\tFOUND coord: {match[0]}, {match[1]} for {s['post_code']}, {s['street']}")
                 s['latitude'], s['longitude'] = match
-                writer.writerow(filter_row(s,compute_s2))
+                writer.writerow(filter_row(s))
             else:
                 print(f"\tNOT FOUND coords: for {s['post_code']}, {s['street']}")
                 still_problems.append(s)
@@ -239,7 +246,7 @@ def prepare_stations(plz_region_file : str, stations_dataset :str, output :str, 
             if match:
                 print(f"\tFOUND: {match[0]}, {match[1]} for {s['post_code']}, {s['city']}")
                 s['post_code'], s['city'] = match
-                writer.writerow(filter_row(s,compute_s2))
+                writer.writerow(filter_row(s))
             else:
                 print(f"\tNOT FOUND: for {s['post_code']}, {s['city']}")
                 still_problems.append(s)
@@ -258,7 +265,7 @@ def prepare_regions(plz_region_file : str, output_file : str):
     new_mapping: dict[str,str] = {'post_code' : 'plz', 'cities' : 'ort', 'landkreis' : 'landkreis', 'bundesland' : 'bundesland' }
     with open(plz_region_file, 'r') as input, open(output_file,'w+') as outfile:
         reader = csv.DictReader(input)  
-
+              
         writer = csv.DictWriter(outfile, fieldnames=list(new_mapping.keys()))
         writer.writeheader()
 
@@ -267,26 +274,17 @@ def prepare_regions(plz_region_file : str, output_file : str):
 
 
 
-REGIONS_OUTPUT="regions_ready.csv"
 STATION_OUTPUT="stations_ready.csv"
 
 def main():
-    parser = argparse.ArgumentParser(description="Usage: <station_file> <region_file> [-c (--clean)] [-s2]")
+    parser = argparse.ArgumentParser(description="Usage: <station_file> <region_file>")
     parser.add_argument('station_file', type=str, help="station input file")
     parser.add_argument('region_file', type=str, help="region input file")
-    parser.add_argument('-c', '--clean', action='store_true', help="Execute stations cleaning (otherwise only trimming)")
-    parser.add_argument('-s2', action='store_true', help="Compute S2 cell ids (otherwise set to 0)")
     args = parser.parse_args()
-    just_trim = not args.clean 
-    compute_s2 = args.s2
-    print(f"Compute s2 ids? {compute_s2}")
+
     
-    
-    prepare_regions(args.region_file,os.path.join(os.path.dirname(args.region_file),REGIONS_OUTPUT))
-    print(f'Regions dataset ready in {REGIONS_OUTPUT}')
-    
-    prepare_stations(args.region_file,args.station_file,os.path.join(os.path.dirname(args.station_file),STATION_OUTPUT),just_trim,compute_s2)
-    print(f'Stations dataset ready {"(and cleared)" if not just_trim else ""} in {STATION_OUTPUT}')
+    prepare_stations(args.region_file,args.station_file,os.path.join(os.path.dirname(args.station_file),STATION_OUTPUT))
+    print(f'Stations dataset ready in {STATION_OUTPUT}')
     
 
 if __name__ == "__main__":

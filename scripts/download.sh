@@ -4,25 +4,23 @@
 org=tankerkoenig
 repo=tankerkoenig-data
 
-
-date_station_file="$(date --date="yesterday" "+%Y-%m-%d")" #latest stations file
-#date_station_file="2024-11-01" 
-station_file="${date_station_file}-stations.csv" 
-station_path="stations/$(date -d "$date_station_file" "+%Y/%m")/${station_file}"
-file_station_out="stations.csv"
-
-#prices to download
-start_date="2024/04"
-end_date="2024/06"
-folder_prices_out="prices"
-
-
 #https://www.suche-postleitzahl.org/downloads
 base_url="https://downloads.suche-postleitzahl.org/v2/public"
 plz_info="zuordnung_plz_ort.csv"
 plz_5stellig="plz-5stellig.shp.zip"
 
 
+date_station_file="$(date --date="yesterday" "+%Y-%m-%d")" #latest stations file (custom date with "2024-11-01")
+station_file="${date_station_file}-stations.csv" 
+station_path="stations/$(date -d "$date_station_file" "+%Y/%m")/${station_file}"
+file_station_out="stations.csv"
+
+#prices to download 
+start_date="2023/11"
+end_date="2024/11"
+folder_prices_out="prices"
+
+REMOVE_ZIP=true
 
 # -------------------------------------------------
 download_stations=false

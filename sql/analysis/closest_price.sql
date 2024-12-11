@@ -1,6 +1,6 @@
 WITH param AS (
-    SELECT  %s::TIMESTAMP  AS target_date,
-            %s::INTERVAL AS interval_value,
+    SELECT  $1::TIMESTAMP  AS target_date,
+            $2::INTERVAL AS interval_value,
 ),
 WITH diesel_prices AS (
     SELECT p.station_uuid as id,
@@ -20,7 +20,7 @@ SELECT s.id AS station_uuid,
        s.name as name,
        s.latitude as latitude,
        s.longitude as longitude,
-       s.post_code as post_code,
+       -- s.post_code as post_code,
       
        diesel_prices.price as diesel,
        diesel_prices.time as time
