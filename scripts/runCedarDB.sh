@@ -15,10 +15,10 @@ $DOCKER stop $CONTAINER
 
 sleep 2
 
-$DOCKER run --rm -d \
+$DOCKER run --rm -it \
     --name $CONTAINER -p 5432:5432 \
     --env-file $ENV_FILE \
-    -v ./data:$DATA_FOLDER -v ./sql:/sql \
+    -v ./data:$DATA_FOLDER -v ./sql:$SQL_FOLDER \
     -v cedardb_data:/var/lib/cedardb/data \
      $IMAGE_NAME
 

@@ -13,7 +13,7 @@ plz_5stellig="plz-5stellig.shp.zip"
 date_station_file="$(date --date="yesterday" "+%Y-%m-%d")" #latest stations file (custom date with "2024-11-01")
 station_file="${date_station_file}-stations.csv" 
 station_path="stations/$(date -d "$date_station_file" "+%Y/%m")/${station_file}"
-file_station_out="stations.csv"
+file_station_out="stations_original.csv"
 
 #prices to download 
 start_date="2023/11"
@@ -25,19 +25,17 @@ REMOVE_ZIP=true
 # -------------------------------------------------
 download_stations=false
 download_prices=false
-download_regions=false
 
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 <data_folder> [-s]  [-r] [-p]"
+    echo "Usage: $0 <data_folder> [-s] [-p]"
     exit 1
 fi
 data_folder=$1
 shift 
 
-while getopts "spr" opt; do
+while getopts "sp" opt; do
     case "$opt" in
         s) download_stations=true ;;
-        r) download_regions=true ;;
         p) download_prices=true ;;
         *) 
             echo "Invalid option: -$OPTARG"
@@ -53,15 +51,8 @@ mkdir -p $data_folder
 
 if $download_stations; then
     curl -L -o "${data_folder}/${file_station_out}" "https://dev.azure.com/${org}/${repo}/_apis/git/repositories/${repo}/items?path=${station_path}"
-fi
-
-
-if $download_regions; then
     curl -L -o "${data_folder}/${plz_info}" "${base_url}/${plz_info}"
-    # curl -L -o "${data_folder}/${plz_5stellig}" "${base_url}/${plz_5stellig}" 
-    # unzip -q "${data_folder}/${plz_5stellig}" -d "${data_folder}/${plz_5stellig%.zip}"
 fi
-
 
 if $download_prices; then
     prices_folder="${data_folder}/${folder_prices_out}"

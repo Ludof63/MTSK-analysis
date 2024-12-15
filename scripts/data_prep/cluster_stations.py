@@ -19,13 +19,13 @@ CONN_STR=f"host=localhost port={PORT} user={USER} password={USER_PSWD} dbname={D
 
 OUTPUT_FOLDER = get_real_path("plots")
 
-
+DATA_FOLDER="../../data/"
 CLUSTERS_TABLE="stations_clusters"
 
 
 #------------------------------------------------------------------------------------
 def create_cluster_table(km_dst : int):
-    query = open(get_real_path("../sql/queries/cluster_stations.sql"),"r").read()
+    query = open(get_real_path("../../sql/clustering/cluster_stations.sql"),"r").read()
     query =  re.sub(r'\$\d+', '%s', query)
 
     with pg.connect(CONN_STR) as conn:
@@ -34,7 +34,7 @@ def create_cluster_table(km_dst : int):
 
 
 def merge_clusters_center(dst_km : int):        
-    query = open(get_real_path(f"../sql/queries/closest_clusters.sql"),"r").read()
+    query = open(get_real_path(f"../../sql/clustering/closest_clusters.sql"),"r").read()
     query =  re.sub(r'\$\d+', '%s', query)
 
     with pg.connect(CONN_STR) as conn:
@@ -75,7 +75,7 @@ def plot_cluster_on_map(file : str):
     folium.TileLayer("CartoDB Positron",control=False).add_to(m)
 
     with pg.connect(CONN_STR) as conn:
-        df = pd.read_sql(open(get_real_path("../sql/queries/list_clusters.sql"),"r").read(),conn)
+        df = pd.read_sql(open(get_real_path("../../sql/clustering/list_clusters.sql"),"r").read(),conn)
 
 
     for idx, row in df.iterrows():
@@ -101,12 +101,12 @@ def export_clusters():
     with pg.connect(CONN_STR) as conn:
         df = pd.read_sql(f"SELECT * from {CLUSTERS_TABLE};", conn)
 
-    df.to_csv(get_real_path(f"../data/{CLUSTERS_TABLE}.csv"), index=False)
+    df.to_csv(get_real_path(f"{DATA_FOLDER}/{CLUSTERS_TABLE}.csv"), index=False)
 
 #-----------------------------------------------------------
 def main():    
     DST_KM = 30
-    DO_PLOT=False
+    DO_PLOT=True
 
     create_cluster_table(DST_KM)
     print("CREATED TABLE stations_clusters")

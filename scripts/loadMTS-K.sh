@@ -79,6 +79,15 @@ execute_query(){
     echo -e "\n"
 }
 
+
+PATH_TO_SCHEMA="$PATH_TO_SQL_FOLDER/$SCHEMA_FILE"
+if [ ! -e "$PATH_TO_SCHEMA" ]; then
+    echo "Cannot continue without schema $PATH_TO_SCHEMA"
+    exit 1
+fi
+
+
+
 #create schema---------------------------------
 if [[ "$do_create" -eq 1 ]]; then
   execute_query "$(cat "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE")" || exit 1
@@ -101,22 +110,46 @@ fi
 
 #stations --------------------------------------
 if [[ "$do_stations" -eq 1 ]]; then
-    if [[ "$do_create" -eq 0 ]]; then
-        execute_query "drop table if exists $STATIONS_TABLE;"
-        execute_query "$(extract_create_table "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE" $STATIONS_TABLE)"
+
+    PATH_TO_STATIONS="$DATA_FOLDER/$STATION_FILE"
+    if [ -e "$PATH_TO_STATIONS" ]; then
+        if [[ "$do_create" -eq 0 ]]; then
+            execute_query "drop table if exists $STATIONS_TABLE;"
+            execute_query "$(extract_create_table "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE" $STATIONS_TABLE)"
+        fi
+        execute_query "copy $STATIONS_TABLE from $PATH_TO_STATIONS with(format csv, delimiter ',', null '', header true);"
+    else
+        echo "File not found $PATH_TO_STATIONS -> doing nothing"
+    fi
+
+
+    PATH_TO_TIMES="$DATA_FOLDER/$TIMES_FILE"
+    if [ -e "$PATH_TO_STATIONS" ]; then
+        if [[ "$do_create" -eq 0 ]]; then
+            execute_query "drop table if exists $TIMES_TABLE;"
+            execute_query "$(extract_create_table "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE" $TIMES_TABLE)"
+        fi
+        execute_query "copy $TIMES_TABLE from $PATH_TO_TIMES with(format csv, delimiter ',', null '', header true);"
+    else
+        echo "File not found $PATH_TO_TIMES -> doing nothing"
     fi
     
-    execute_query "copy $STATIONS_TABLE from '$DATA_FOLDER/$STATION_FILE' with(format csv, delimiter ',', null '', header true);"
+
 fi
 
 
 #clusters ----------------------------------------
 if [[ "$do_clusters" -eq 1 ]]; then
-    if [[ "$do_create" -eq 0 ]]; then
-        execute_query "drop table if exists $CLUSTERS_TABLE;"
-        execute_query "$(extract_create_table "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE" $CLUSTERS_TABLE)"
+    PATH_TO_CLUSTERS="$DATA_FOLDER/$CLUSTERS_FILE"
+    if [ -e "$PATH_TO_STATIONS" ]; then
+        if [[ "$do_create" -eq 0 ]]; then
+            execute_query "drop table if exists $CLUSTERS_TABLE;"
+            execute_query "$(extract_create_table "$PATH_TO_SQL_FOLDER/$SCHEMA_FILE" $CLUSTERS_TABLE)"
+        fi
+
+        execute_query "copy $CLUSTERS_TABLE from $PATH_TO_CLUSTERS with(format csv, delimiter ',', null '', header true);"
+    else
+        echo "File not found $PATH_TO_CLUSTERS -> doing nothing"
     fi
-    
-    execute_query "copy $CLUSTERS_TABLE from '$DATA_FOLDER/$CLUSTERS_FILE' with(format csv, delimiter ',', null '', header true);"
     
 fi

@@ -1,19 +1,20 @@
 import csv
 import os
+from datetime import datetime
 from typing import Any, TypeAlias
 import requests
 import random
 import argparse
 import json
 
-LEVEL = 10
+
+
+RowType : TypeAlias =  dict[str | Any, str | Any]
 
 def get_real_path(relative_path : str) -> str:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(script_dir, relative_path)
 
-
-RowType : TypeAlias =  dict[str | Any, str | Any]
 
 def is_point_in_germany(row : RowType):
     lat, lon = float(row['latitude']), float(row['longitude'])
@@ -103,15 +104,33 @@ def query_for_coordinates(post_code : str, street : str) -> tuple[float, float] 
 
 columns_to_keep = ['uuid', 'name', 'brand', 'street', 'house_number', 'post_code', 'city', 'latitude', 'longitude']
 stations_header = columns_to_keep + ['always_open']
+times_header = ['uuid', 'days', 'open_at', 'close_at']
+
+
+TIMES : list[RowType] = []
+
+
+def add_stations_time(st_time, stations_id) -> bool:
+    if 'openingTimes' not in st_time:
+        return True #always open
+    
+    for t in st_time['openingTimes']:
+        days = int(t['applicable_days'])
+        assert(len(t['periods']) == 1)
+        open,close = t['periods'][0]['startp'], t['periods'][0]['endp']
+        TIMES.append({'uuid': stations_id, 'days': days, 'open_at': open, 'close_at': close})
+        #print(f"{days} -> [{open}, {close}]")
+
+    return False
+    #input("Continue?")
+
 
 def filter_row(row : RowType) -> RowType:
     filter_row = {key : row.get(key, '') for key in columns_to_keep}
-    times = json.loads(row['openingtimes_json'])
-    assert(isinstance(times, dict))
-    if not times:
-        filter_row['always_open'] = 'true'
-    else:
-        filter_row['always_open'] = 'false'
+    filter_row['brand'] = filter_row['brand'].title()
+
+    filter_row['always_open'] = add_stations_time(json.loads(row['openingtimes_json']), filter_row['uuid'])
+
     return filter_row
     
 
@@ -143,6 +162,9 @@ def find_best_match(city : str, possible_cities : list[str]) -> str | None:
 
 
 AVOID_STR= ["please delete - bitte loeschen", "Nicht", "mehr aktiv", "", "gelöscht", "Hh Admi-Testkasse", "12345"]
+
+
+
 
 def prepare_stations(plz_region_file : str, stations_dataset :str, output :str):
     tmp_out_file = 'data_temp.csv'
@@ -274,7 +296,8 @@ def prepare_regions(plz_region_file : str, output_file : str):
 
 
 
-STATION_OUTPUT="stations_ready.csv"
+STATION_OUTPUT="stations.csv"
+TIMES_OUTPUT="stations_times.csv"
 
 def main():
     parser = argparse.ArgumentParser(description="Usage: <station_file> <region_file>")
@@ -285,6 +308,15 @@ def main():
     
     prepare_stations(args.region_file,args.station_file,os.path.join(os.path.dirname(args.station_file),STATION_OUTPUT))
     print(f'Stations dataset ready in {STATION_OUTPUT}')
+
+    with open(os.path.join(os.path.dirname(args.station_file),TIMES_OUTPUT),'w+') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=times_header) 
+        writer.writeheader()
+        
+        for row in TIMES:
+            writer.writerow(row)
+    print(f'Stations Times ready in {TIMES_OUTPUT}')
+
     
 
 if __name__ == "__main__":
