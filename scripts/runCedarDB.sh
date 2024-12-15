@@ -1,6 +1,7 @@
 #!/bin/bash
 # RUN IN THE ROOT OF THE PROJECT
 ENV_FILE=.env
+source .env
 
 # Default values
 IMAGE_NAME=mts-k-cedardb
@@ -60,6 +61,6 @@ $DOCKER run --rm -d \
 sleep 2
 
 #activate more logs -> if not ready connect to stream of logs
-$DOCKER exec $CONTAINER psql -v ON_ERROR_STOP=1 "$CONN_STR" -c "set debug.verbosity='debug1';" || docker logs -f $CONTAINER
+$DOCKER exec $CONTAINER psql -v ON_ERROR_STOP=1 "$CONN_STR" -c "set debug.verbosity='debug1';" || $DOCKER logs -f $CONTAINER
 
 
