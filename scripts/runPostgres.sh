@@ -16,6 +16,7 @@ docker run -d --rm \
   -e POSTGRES_USER=$CEDAR_USER \
   -e POSTGRES_PASSWORD=$CEDAR_PASSWORD \
   -e POSTGRES_DB=$CEDAR_DB \
+  --env-file $ENV_FILE \
   -v ./data:$DATA_FOLDER \
   -v ./sql:$SQL_FOLDER \
   -v $VOLUME_NAME:/var/lib/postgresql/data \
