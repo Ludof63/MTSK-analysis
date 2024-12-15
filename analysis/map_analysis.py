@@ -10,6 +10,7 @@ import folium
 import branca.colormap as cm
 from folium.plugins import MarkerCluster
 from typing import List
+import re
 
 def get_real_path(relative_path : str) -> str:
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +37,8 @@ INTERVAL="30 minutes"
 
 def query_closest_price(fuel : str = 'diesel') -> pd.DataFrame:
     query = open(get_real_path(CLOSEST_PRICE),"r").read()
+    query =  re.sub(r'\$\d+', '%s', query)
+
     if fuel != 'diesel':
         query = query.replace("diesel",fuel)
     
@@ -142,7 +145,7 @@ def create_cluster(df : pd.DataFrame, fuel : str) -> MarkerCluster:
             fill_color=color,
             color=color,
             radius=2,
-            popup=f"{fuel.capitalize()}: {row[fuel]:.4f}\nid:{row['station_uuid']}\npost_code:({row['post_code']})"
+            popup=f"{fuel.capitalize()}: {row[fuel]:.4f}\nid:{row['station_uuid']}\n)"
         )
         marker.options['z_score'] = z_score
         cluster_markers.add_child(marker)
@@ -157,15 +160,17 @@ def map_analysis():
     m = folium.Map(tiles=None,location=(51.1657, 10.4515),zoom_start=7,control_scale=True)
     
     folium.TileLayer("CartoDB Positron",control=False).add_to(m)
+
+
     colormap.add_to(m)
 
-    for fuel in ["diesel", "e5", "e10"]:
+    for fuel in ["diesel","e5", "e10"]:
         df = query_closest_price(fuel)
         #df = df.head(4)
         print(f"Query done for {fuel}")
 
         #sanity check
-        required_columns = ['station_uuid','name','post_code','latitude', 'longitude',fuel]
+        required_columns = ['station_uuid','name','latitude', 'longitude',fuel]
         assert set(required_columns).issubset(df.columns), f"Missing columns: {set(required_columns) - set(df.columns)}"
 
         plot_hg(df,fuel)
