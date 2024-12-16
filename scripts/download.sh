@@ -16,8 +16,8 @@ station_path="stations/$(date -d "$date_station_file" "+%Y/%m")/${station_file}"
 file_station_out="stations_original.csv"
 
 #prices to download 
-start_date="2023/11"
-end_date="2024/11"
+START_DATE_PRICES="2023/11"
+END_DATE_PRICES="2024/11"
 folder_prices_out="prices"
 
 REMOVE_ZIP=true
@@ -58,11 +58,11 @@ if $download_prices; then
     prices_folder="${data_folder}/${folder_prices_out}"
     mkdir -p $prices_folder
 
-    current_date="$start_date"
-    end_date_month=$(date -d "$end_date/01 + 1 month" "+%Y/%m")
-    echo $end_date_month
+    current_date="$START_DATE_PRICES"
+    END_DATE_PRICES_month=$(date -d "$END_DATE_PRICES/01 + 1 month" "+%Y/%m")
+    echo $END_DATE_PRICES_month
 
-    while [[ "$current_date" < "$end_date_month" ]]; do
+    while [[ "$current_date" < "$END_DATE_PRICES_month" ]]; do
         filename="prices_$(echo "$current_date" | sed 's/\//_/').zip"
         echo "Downloading prices for $current_date in $filename"
 

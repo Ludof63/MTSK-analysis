@@ -106,7 +106,7 @@ file_exists(){
 
 if ! file_exists $PATH_TO_SCHEMA; then
     echo "Cannot continue without schema $PATH_TO_SCHEMA"
-    exit 1
+    exit 0
 fi
 
 extract_table_schema() {
