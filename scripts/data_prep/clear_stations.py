@@ -118,6 +118,8 @@ def add_stations_time(st_time, stations_id) -> bool:
         days = int(t['applicable_days'])
         assert(len(t['periods']) == 1)
         open,close = t['periods'][0]['startp'], t['periods'][0]['endp']
+        if close in ['00:00','24:00']:
+            close = '23:59:59'
         TIMES.append({'uuid': stations_id, 'days': days, 'open_at': open, 'close_at': close})
         #print(f"{days} -> [{open}, {close}]")
 
