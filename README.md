@@ -1,64 +1,72 @@
 # MTS-K - Analysis with CedarDB
 
-The Markttransparenzstelle für Kraftstoffe (MTS-K) collects all gas station fuel prices all over Germany, the dataset is the collection of all the price changes (https://dev.azure.com/tankerkoenig/tankerkoenig-data). 
+This is a data analysis on the historical fuel prices in Germany with [CedarDB](https://cedardb.com), a blazingly fast **HTAP** database.
 
-This repository contains a collection of data analysis example with [CedarDB](https://cedardb.com), a postgres-compliant **HTAP** database.
+The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) (MTS-K) collects the fuel prices of gas stations all over Germany. A history of all price changes is available at https://dev.azure.com/tankerkoenig/tankerkoenig-data. 
+
+This repository contains mainly:
+
+- Scripts to download/prepare/ingest the dataset
+- A collection of data analysis examples
 
 ## Getting Started with MTS-K analysis
 
 1. **Download the Dataset**
-   This repository already contains in `data/`  the stations dataset (prepared, for more details refer to `scripts/data_prep/README.md`).  The prices dataset (the larger part) can be downloaded using `scripts/download.sh`.
+   This repository already contains a prepared version of the gas stations dataset in `data/`  (more details on the preprocessing in `scripts/data_prep/README.md`).  To start the analysis you first need to download a chunk of historical prices. You can do that running the following:
 
    ```bash
    ./scripts/download.sh data -p
    ```
 
-   `./scripts/download.sh <data_folder> [-s] [-p]` will download in the data_folder (in the example data/) the prices files. By default it downloads one year of historical data from 2023/11 to 2024/11, which uncompressed is around 13 GB. If you want to download a different time period refer to `/scripts/README.md`.
+   This will download in the data_folder (by default `data/`) the prices files. By default it downloads one year of historical data (from 2023/11 to 2024/11), which uncompressed is around 13 GB. To download a different time period, refer to `/scripts/README.md`.
 
-2. **Start Database**
+2. **Start the Database**
 
-   You can start CedarDB either with
-
-   ```bash
-   docker-compose up --build -d
-   ```
-
-   or with
+   Assuming you have CedarDB docker image locally as `cedardb` , you can run
 
    ```bash
-   ./scripts/runCedarDB.sh
+   docker-compose up --build
    ```
 
-   Both solutions use a custom docker image that adds loading script in `/docker-entrypoint-initdb.d/` of the container. This script will be executed the first time the [container is started](https://cedardb.com/docs/getting_started/running_docker_image/#preloading-data) (as the default configuration make the database persistent using the volume `cedardb_data`), and it will create the schema (`sql/MTS-K_schema.sql`) and load the data using the `scripts/loadMTS-K.sh` and the configurations in `.env` .
+   This will take care of initializing a database, creating the schema `sql/MTS-K_schema.sql` and loading the data. It does so by utilizing a custom docker image that build on top of `cedardb`. 
 
-   > By default `.env` loads all the prices in `data/prices/`. This can take a while, you can follow the status of the initialization using `docker logs -f cedardb_runner` (default behavior of `./scripts/runCedarDB.sh`)
+   CedarDB will run scripts `/docker-entrypoint-initdb.d/` [during the initialization of the db](https://cedardb.com/docs/getting_started/running_docker_image/#preloading-data). The custom image copies a loading script (`scripts/loadMTS-K.sh`) and then adds a single line script in `/docker-entrypoint-initdb.d/` that runs the loading script.
 
-   > Using `./scripts/runCedarDB.sh` you can also use podman
+   For the initialization phase uses the configurations (environment variables passed to the container) in `.env`. These are used by CedarDB in first place to initialize the database (`CEDAR_USER`, `CEDAR_PASSWORD`, `CEDAR_DB`) and then by `scripts/loadMTS-K.sh` to determine which data to load. 
+   For example, `PRICES_FOLDER = prices/` means the script will load all the prices file in `/data`, the is mounted as a volume for the container on `./data ` in the `docker-compose.yml`.  
 
-   > You can also start postgres with `./scripts/runPostgres.sh`, this will also setup user and db following `.env`, however you will have to create the schema and load data after. You can do that using `scripts/loadMTS-K.sh` (more details in `/scripts/README.md`) 
+   > If you don't have docker-compose locally you can run it directly with docker but also with podman using the script `./scripts/runCedarDB.sh` (more details in `/scripts/README.md`)
+
+   > As explained before, by default on database initialization the loading scripts loads all prices `./data/prices/`. This can take a while if you've downloaded 1 year of data.
+
+   > The database is persisted using the volume `cedard_data` (details in `docker-compose.yml)`.
 
 3. **Query the Database**
 
-   If you have [psql](https://cedardb.com/docs/clients/psql/) installed in your local environment you can connect using
-
-   ```bash
-   psql 'host=localhost user=client dbname=client password=client'
-   ```
-
-   otherwise you can use the container's psql with 
+   With the default configurations you can access CedarDB running
 
    ```bash
    docker exec -it cedardb_runner psql ' user=client dbname=client password=client'
    ```
 
-   > Assuming you're using the default configuration of `.env`
 
-4. **Take a look at the Analysis**
+    If you have [psql](https://cedardb.com/docs/clients/psql/) locally, you can run directly
 
-   TODO
+   ```bash
+   psql 'host=localhost user=client dbname=client password=client'
+   ```
 
-   > ```bash
-   > ./scripts/runGrafana.sh
-   > ```
-   >
-   > This will start a container with [Grafana](https://cedardb.com/docs/clients/grafana/), available at http://127.0.0.1:3000
+
+## Analyzing Germany Fuel Prices
+
+Main results...TODO
+
+#### Run Grafana
+
+To start Grafana you can use
+
+```bash
+./scripts/runGrafana.sh
+```
+
+This will run a container with [Grafana](https://cedardb.com/docs/clients/grafana/), available at http://127.0.0.1:3000
