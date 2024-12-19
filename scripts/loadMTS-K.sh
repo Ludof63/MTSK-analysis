@@ -33,9 +33,9 @@ prices_dir=""
 usage() {
     echo "Usage: $0 [-c] [-s] [-p prices_dir] [-r] [-o]"
     echo "  -c              create schema from $PATH_TO_SCHEMA (container-relative)"
-    echo "  -s              load stations from $DATA_FOLDER/$STATION_FILE (container-relative) "
+    echo "  -s              load stations from $PATH_TO_STATIONS and $PATH_TO_TIMES (container-relative) "
     echo "  -p prices_dir   load prices from <prices_dir> in $DATA_FOLDER (container-relative)"
-    echo "  -r              load clusters from $DATA_FOLDER/$CLUSTER_FILE (container-relative)"
+    echo "  -r              load clusters from $PATH_TO_CLUSTERS (container-relative)"
     echo "  -o              use postgres -> container: $PG_CONTAINER"
     exit 1
 }
@@ -61,7 +61,7 @@ while getopts ":cp:sro" opt; do
             echo "Using use postgres -> container: $PG_CONTAINER"
             ;;
         ?)
-            echo "Invalid option $opt"
+            echo "Invalid option"
             usage
             ;;
         *)

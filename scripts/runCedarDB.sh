@@ -23,7 +23,7 @@ while getopts "bi:" opt; do
       CUSTOM_IMAGE=$OPTARG
       ;;
     *)
-      echo "Usage: $0 [-b] [-p] [-i <image_name>]"
+      echo "Usage: $0 [-b] [-i <image_name>]"
       exit 1
       ;;
   esac

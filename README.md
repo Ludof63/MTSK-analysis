@@ -1,6 +1,6 @@
-# MTS-K - Analysis with CedarDB
+# An Analysis of Germany's Fuel Prices
 
-This is a data analysis on the historical fuel prices in Germany with [CedarDB](https://cedardb.com), a blazingly fast **HTAP** database.
+A data analysis of the historical fuel prices in Germany with [CedarDB](https://cedardb.com), a blazingly fast **HTAP** database.
 
 The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) (MTS-K) collects the fuel prices of gas stations all over Germany. A history of all price changes is available at https://dev.azure.com/tankerkoenig/tankerkoenig-data. 
 
@@ -25,21 +25,25 @@ This repository contains mainly:
    Assuming you have CedarDB docker image locally as `cedardb` , you can run
 
    ```bash
-   docker-compose up --build
+   docker-compose up
    ```
 
    This will take care of initializing a database, creating the schema `sql/MTS-K_schema.sql` and loading the data. It does so by utilizing a custom docker image that build on top of `cedardb`. 
 
-   CedarDB will run scripts `/docker-entrypoint-initdb.d/` [during the initialization of the db](https://cedardb.com/docs/getting_started/running_docker_image/#preloading-data). The custom image copies a loading script (`scripts/loadMTS-K.sh`) and then adds a single line script in `/docker-entrypoint-initdb.d/` that runs the loading script.
+   CedarDB will run scripts in`/docker-entrypoint-initdb.d/` [during the initialization of the db](https://cedardb.com/docs/getting_started/running_docker_image/#preloading-data). 
+   The custom image copies a loading script (`scripts/loadMTS-K.sh`) and then adds a single line script in `/docker-entrypoint-initdb.d/` that runs the loading script.
 
    For the initialization phase uses the configurations (environment variables passed to the container) in `.env`. These are used by CedarDB in first place to initialize the database (`CEDAR_USER`, `CEDAR_PASSWORD`, `CEDAR_DB`) and then by `scripts/loadMTS-K.sh` to determine which data to load. 
+
    For example, `PRICES_FOLDER = prices/` means the script will load all the prices file in `/data`, the is mounted as a volume for the container on `./data ` in the `docker-compose.yml`.  
 
-   > If you don't have docker-compose locally you can run it directly with docker but also with podman using the script `./scripts/runCedarDB.sh` (more details in `/scripts/README.md`)
+   > If you don't have docker-compose locally you can run it directly with docker but also with podman using the script `./scripts/runCedarDB.sh` (see `/scripts/README.md`)
 
    > As explained before, by default on database initialization the loading scripts loads all prices `./data/prices/`. This can take a while if you've downloaded 1 year of data.
 
    > The database is persisted using the volume `cedard_data` (details in `docker-compose.yml)`.
+
+   > `scripts/loadMTS-K.sh` can be used to load data after the initialization (see `/scripts/README.md`)
 
 3. **Query the Database**
 
@@ -60,13 +64,3 @@ This repository contains mainly:
 ## Analyzing Germany Fuel Prices
 
 Main results...TODO
-
-#### Run Grafana
-
-To start Grafana you can use
-
-```bash
-./scripts/runGrafana.sh
-```
-
-This will run a container with [Grafana](https://cedardb.com/docs/clients/grafana/), available at http://127.0.0.1:3000

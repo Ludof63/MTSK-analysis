@@ -6,6 +6,10 @@ CONTAINER_NAME=postgres_runner
 ENV_FILE=.env 
 VOLUME_NAME=postgres_data
 
+if [ -n "$USE_PODMAN" ]; then
+    DOCKER=podman
+    echo "Using Podman as the container runtime."
+fi
 
 source $ENV_FILE
 
