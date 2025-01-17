@@ -16,14 +16,6 @@ create table stations (
     always_open boolean not null
 );
 
-
-create table stations_times (
-    station_id uuid not null,
-    days int not null,
-    open_time time not null,
-    close_time time not null
-);
-
 create table prices (
     time timestamp not null,
     station_uuid uuid,
@@ -35,6 +27,13 @@ create table prices (
     e10_change smallint not null
    
     -- primary key(station_uuid,time) 
+);
+
+create table stations_times (
+    station_id uuid not null,
+    days int not null,
+    open_time time not null,
+    close_time time not null
 );
 
 create table stations_clusters (
