@@ -1,3 +1,3 @@
-.venv
-plots/
-test.py
+.gitignore
+analysis_ts.md 
+update_frequencies.md

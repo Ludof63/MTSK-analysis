@@ -1,0 +1,6 @@
+pandas
+psycopg[binary,pool]
+
+matplotlib
+numpy
+folium
