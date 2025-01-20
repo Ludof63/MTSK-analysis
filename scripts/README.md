@@ -1,5 +1,3 @@
-
-
 ## Download the Dataset
 
 ```bash
@@ -9,7 +7,7 @@
 This script downloads in data_folder datasets. In particular:
 
 - `-p` : if this option is passed it downloads the prices from [here](https://dev.azure.com/tankerkoenig/tankerkoenig-data/_git/tankerkoenig-data?path=/prices). By default it downloads and extracts 1 year of data, from 2023/11 to 2024/11. The chunk of prices to download can be customized by setting `START_DATE_PRICES` and `END_DATE_PRICES` directly in the script
-- `-s`: download the latest original stations dataset from [here](https://dev.azure.com/tankerkoenig/tankerkoenig-data/_git/tankerkoenig-data?path=/stations). It also downloads the official mapping of cities and postcodes in Germany from here. 
+- `-s`: download the latest original stations dataset from [here](https://dev.azure.com/tankerkoenig/tankerkoenig-data/_git/tankerkoenig-data?path=/stations). It also downloads the official mapping of cities and postcodes in Germany from [here](https://www.suche-postleitzahl.org/downloads) ([zuordnung_plz_ort](https://www.suche-postleitzahl.org/downloads#)). 
   The repository comes with an already prepared station dataset, generated from the stations dataset of 01/12/2024. However, if you want to run the analysis on prices after the 01/12/2024 you should either check that no new station was added or download the original stations dataset with `./scripts/download.sh -s` and then execute the pre-processing as described in `scripts/data_prep/README.md`
 
 ## Loading the Dataset

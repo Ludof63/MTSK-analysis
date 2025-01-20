@@ -16,8 +16,8 @@ station_path="stations/$(date -d "$date_station_file" "+%Y/%m")/${station_file}"
 file_station_out="stations_original.csv"
 
 #prices to download 
-START_DATE_PRICES="2023/11"
-END_DATE_PRICES="2024/11"
+START_DATE_PRICES="2024/01"
+END_DATE_PRICES="2024/12"
 folder_prices_out="prices"
 
 REMOVE_ZIP=true
