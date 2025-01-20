@@ -15,33 +15,34 @@ While if you want to run some analysis on the dataset yourself you can follow th
 
 ## Getting Started with MTS-K analysis
 
-1. **Download the Dataset**
-   This repository already contains a prepared version of the gas stations dataset in `data/`  (more details on the preprocessing in `scripts/data_prep/README.md`).  To start the analysis you first need to download a chunk of historical prices. You can do that running the following:
-
+1. ### **Download the Dataset**
+   
+   This repository contains an already prepared stations dataset `data/`  (more details on the preprocessing in `scripts/data_preparation.md`).  To start the analysis you first need to download a chunk of historical prices. You can do that running the following:
+   
    ```bash
    ./scripts/download.sh data -p
    ```
+   
+   This will download in the data_folder (by default `data/`) the prices files. By default it downloads one year of historical data (from 2023/11 to 2024/11), which uncompressed is around 13 GB. To download a different time period take a look at `/scripts/README.md`.
+   
+2. ### **Start the Database**
 
-   This will download in the data_folder (by default `data/`) the prices files. By default it downloads one year of historical data (from 2023/11 to 2024/11), which uncompressed is around 13 GB. To download a different time period, refer to `/scripts/README.md`.
-
-2. **Start the Database**
-
-   Assuming you have CedarDB docker image locally as `cedardb` , you can run
+   Assuming you have CedarDB image locally as `cedardb` , you can run
 
    ```bash
    docker-compose up
    ```
 
-   This will take care of initializing a database, creating the schema `sql/MTS-K_schema.sql` and loading the data. It does so by utilizing a custom docker image that build on top of `cedardb`. 
+   This process initializes the database, creates the schema, and loads data from `sql/MTS-K_schema.sql`. It uses a custom Docker image built on top of `CedarDB`.
 
-   CedarDB will run scripts in`/docker-entrypoint-initdb.d/` [during the initialization of the db](https://cedardb.com/docs/getting_started/running_docker_image/#preloading-data). 
-   The custom image copies a loading script (`scripts/loadMTS-K.sh`) and then adds a single line script in `/docker-entrypoint-initdb.d/` that runs the loading script.
+   #### How it works
 
-   For the initialization phase uses the configurations (environment variables passed to the container) in `.env`. These are used by CedarDB in first place to initialize the database (`CEDAR_USER`, `CEDAR_PASSWORD`, `CEDAR_DB`) and then by `scripts/loadMTS-K.sh` to determine which data to load. 
+   1. **Base Image Behavior**: CedarDB automatically runs scripts placed in `/docker-entrypoint-initdb.d/` during the database initialization phase. [Read more here](https://cedardb.com/docs/getting_started/running_docker_image/#preloading-data). 
+   2. **Custom Image Setup**: A custom loading script (`scripts/loadMTS-K.sh`) is included in the image.  A helper script is added to `/docker-entrypoint-initdb.d/` to trigger the loading script during initialization. 
+   3. **Environment Configuration**: The initialization phase relies on environment variables defined in the `.env` file (`CEDAR_USER`, `CEDAR_PASSWORD`, `CEDAR_DB`) used by CedarDB to set up the database.     Additional variables, such as `PRICES_FOLDER`, are used by `scripts/loadMTS-K.sh` to specify the data to load.
+   4. **Data Volume**: The data directory is mounted as a Docker volume. For example, `PRICES_FOLDER=prices/` means that all price files in the `./data` directory (mapped to `/data` in the container) will be loaded.
 
-   For example, `PRICES_FOLDER = prices/` means the script will load all the prices file in `/data`, the is mounted as a volume for the container on `./data ` in the `docker-compose.yml`.  
-
-   > If you don't have docker-compose locally you can run it directly with docker but also with podman using the script `./scripts/runCedarDB.sh` (see `/scripts/README.md`)
+   > If you don't have docker-compose locally you can run it directly with docker (or podman) using the script `./scripts/runCedarDB.sh` (see `/scripts/README.md`)
 
    > As explained before, by default on database initialization the loading scripts loads all prices `./data/prices/`. This can take a while if you've downloaded 1 year of data.
 
@@ -49,16 +50,16 @@ While if you want to run some analysis on the dataset yourself you can follow th
 
    > `scripts/loadMTS-K.sh` can be used to load data after the initialization (see `/scripts/README.md`)
 
-3. **Query the Database**
+3. ### **Query the Database**
 
    With the default configurations you can access CedarDB running
 
    ```bash
    docker exec -it cedardb_runner psql ' user=client dbname=client password=client'
    ```
-
-> If you have [psql](https://cedardb.com/docs/clients/psql/) locally, you can run directly
->
-> ```bash
-> psql 'host=localhost user=client dbname=client password=client'
-> ```
+   
+   If you have [psql](https://cedardb.com/docs/clients/psql/) installed locally, you can run
+   
+   ```bash
+   psql 'host=localhost user=client dbname=client password=client'
+   ```
