@@ -13,6 +13,7 @@ create table stations (
     city text,
     latitude double precision not null,
     longitude double precision not null,
+    first_active timestamp not null,
     always_open boolean not null
 );
 
