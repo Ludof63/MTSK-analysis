@@ -6,8 +6,12 @@ The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE
 
 This repository contains mainly:
 
+- A collection of analysis on the MTS-K dataset
 - Scripts to download/prepare/ingest the dataset
-- A collection of data analysis examples
+
+**Take a look at the analysis [here](https://ludof63.github.io/MTSK-analysis/analysis/).**
+
+While if you want to run some analysis on the dataset yourself you can follow the next steps.
 
 ## Getting Started with MTS-K analysis
 
@@ -53,14 +57,8 @@ This repository contains mainly:
    docker exec -it cedardb_runner psql ' user=client dbname=client password=client'
    ```
 
-
-    If you have [psql](https://cedardb.com/docs/clients/psql/) locally, you can run directly
-
-   ```bash
-   psql 'host=localhost user=client dbname=client password=client'
-   ```
-
-
-## Analyzing Germany Fuel Prices
-
-Main results...TODO
+> If you have [psql](https://cedardb.com/docs/clients/psql/) locally, you can run directly
+>
+> ```bash
+> psql 'host=localhost user=client dbname=client password=client'
+> ```
