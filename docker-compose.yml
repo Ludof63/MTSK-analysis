@@ -1,18 +1,36 @@
 services:
-  cedardb:
-    build:
-      context: .                      
-      dockerfile: Dockerfile                        
-    container_name: cedardb_runner  
-    ports:
-      - "5432:5432"                   
+  cedar:
+    container_name: cedar
+    image: cedardb
+    restart: always
     env_file:
-      - .env                                       
+      - .env 
+    ports:
+      - 5432:5432
     volumes:
       - ./data:/data
-      - ./sql:/sql                  
-      - cedardb_data:/var/lib/cedardb/data                  
+      - cedardb_data:/var/lib/cedardb/data #make db persistent
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres -h 127.0.0.1 -p 5432"]
+      interval: 10s
+      timeout: 1s
+      retries: 10    
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      - GF_DASHBOARDS_MIN_REFRESH_INTERVAL=100ms
+    ports:
+      - 3000:3000
+    depends_on:
+      - cedar
+    volumes:
+      - ./grafana:/etc/grafana/provisioning #to preload configs in grafana
+      - grafana_data:/var/lib/grafana #to persist grafana data
 
 volumes:
   cedardb_data:
-    name: cedardb_data                   
+    name: cedardb_data   
+  grafana_data:
+    name: grafana_data                

@@ -47,9 +47,11 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
 
    - load stations and stations times (opening hours for each stations) from data (`-s`)
 
-   - load all prices in `data/prices`. (`-p data/prices`)
+   - load all prices in `data/prices` and its subfolders. (`-p data/prices`).
 
-     > If you want to load less data you can specify a sub-folder, e.g., `./scripts/load.sh -p data/prices/2024/01` would load all prices of January 2024 (dropping and recreating prices table)
+     >  This can take a while if you've downloaded the whole 2024
+
+     > If you want to load less data you can specify a subfolder, e.g., `./scripts/load.sh -p data/prices/2024/01` would load all prices of January 2024 (dropping and recreating prices table)
 
 4. ### Query the data
 
@@ -65,15 +67,17 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
    > docker exec -it cedar psql 'user=client dbname=client password=client'
    > ```
 
-   
+   #### Some examples
 
-   Here are some queries to start:
+   To check the prices chunk you've loaded:
 
    ```sql
    select min(time)as first , max(time) as  last, count(*) as n_events from prices;
    ```
 
-​	To check the prices chunk you've loaded
+
+
+​	
 
 
 
