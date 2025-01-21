@@ -1,65 +1,81 @@
 # An Analysis of Germany's Fuel Prices
 
-A data analysis of the historical fuel prices in Germany with [CedarDB](https://cedardb.com), a blazingly fast **HTAP** database.
+A data analysis of the historical fuel prices in Germany with [CedarDB](https://cedardb.com).
 
-The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) (MTS-K) collects the fuel prices of gas stations all over Germany. A history of all price changes is available at https://dev.azure.com/tankerkoenig/tankerkoenig-data. 
+The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) (MTS-K) collects the fuel prices for gas station all over Germany. A history of all price changes is available [here](https://dev.azure.com/tankerkoenig/tankerkoenig-data). 
 
-This repository contains mainly:
+This repository contains:
 
-- A collection of analysis on the MTS-K dataset
+- A collection of analysis on the fuel prices in Germany
 - Scripts to download/prepare/ingest the dataset
 
-**Take a look at the analysis [here](https://ludof63.github.io/MTSK-analysis/analysis/).**
+You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-analysis/analysis/).** Or you can run some queries on the dataset yourself, following the next steps.
 
-While if you want to run some analysis on the dataset yourself you can follow the next steps.
+## Getting Started
 
-## Getting Started with MTS-K analysis
-
-1. ### **Download the Dataset**
-   
-   This repository contains an already prepared stations dataset `data/`  (more details on the preprocessing in `scripts/data_preparation.md`).  To start the analysis you first need to download a chunk of historical prices. You can do that running the following:
-   
-   ```bash
-   ./scripts/download.sh data -p
-   ```
-   
-   This will download in the data_folder (by default `data/`) the prices files. By default it downloads one year of historical data (from 2023/11 to 2024/11), which uncompressed is around 13 GB. To download a different time period take a look at `/scripts/README.md`.
-   
-2. ### **Start the Database**
-
-   Assuming you have CedarDB image locally as `cedardb` , you can run
+1. ### Download the Dataset
 
    ```bash
-   docker-compose up
+   ./scripts/download.sh -p
    ```
 
-   This process initializes the database, creates the schema, and loads data from `sql/MTS-K_schema.sql`. It uses a custom Docker image built on top of `CedarDB`.
+   Will download the prices changes dataset. By default it downloads entire 2024 (around 13 GB), but you can change that in the script. This repository contains already a prepared version of the gas stations dataset with their prices in `data/`. 
 
-   #### How it works
+   > If you wanted to work on prices after 21/01/2025 you need to download an up-to-date stations dataset and prepare it ( see `scripts/data_preparation.md`).
 
-   1. **Base Image Behavior**: CedarDB automatically runs scripts placed in `/docker-entrypoint-initdb.d/` during the database initialization phase. [Read more here](https://cedardb.com/docs/getting_started/running_docker_image/#preloading-data). 
-   2. **Custom Image Setup**: A custom loading script (`scripts/loadMTS-K.sh`) is included in the image.  A helper script is added to `/docker-entrypoint-initdb.d/` to trigger the loading script during initialization. 
-   3. **Environment Configuration**: The initialization phase relies on environment variables defined in the `.env` file (`CEDAR_USER`, `CEDAR_PASSWORD`, `CEDAR_DB`) used by CedarDB to set up the database.     Additional variables, such as `PRICES_FOLDER`, are used by `scripts/loadMTS-K.sh` to specify the data to load.
-   4. **Data Volume**: The data directory is mounted as a Docker volume. For example, `PRICES_FOLDER=prices/` means that all price files in the `./data` directory (mapped to `/data` in the container) will be loaded.
+2. ### Start the Database
 
-   > If you don't have docker-compose locally you can run it directly with docker (or podman) using the script `./scripts/runCedarDB.sh` (see `/scripts/README.md`)
-
-   > As explained before, by default on database initialization the loading scripts loads all prices `./data/prices/`. This can take a while if you've downloaded 1 year of data.
-
-   > The database is persisted using the volume `cedard_data` (details in `docker-compose.yml)`.
-
-   > `scripts/loadMTS-K.sh` can be used to load data after the initialization (see `/scripts/README.md`)
-
-3. ### **Query the Database**
-
-   With the default configurations you can access CedarDB running
+   Assuming you have [CedarDB image locally](https://cedardb.com/docs/getting_started/running_docker_image/) as `cedardb` 
 
    ```bash
-   docker exec -it cedardb_runner psql ' user=client dbname=client password=client'
+   docker-compose up -d
    ```
-   
-   If you have [psql](https://cedardb.com/docs/clients/psql/) installed locally, you can run
-   
+
+   Starts CedarDB and [Grafana](https://grafana.com/). You access Grafana at http://localhost:3000/ with username `admin` and password `admin`.
+
+   > You can stop both with `docker-compose down`. By default the database is persisted with a docker volume, if you want a fresh start run `docker-compose down -v`
+
+3. ### Load the data
+
+   ```bash
+   ./scripts/load.sh -c -s -p data/prices
+   ```
+
+   This will:
+
+   - create the schema `sql/schema.sql` (`-c`)
+
+   - load stations and stations times (opening hours for each stations) from data (`-s`)
+
+   - load all prices in `data/prices`. (`-p data/prices`)
+
+     > If you want to load less data you can specify a sub-folder, e.g., `./scripts/load.sh -p data/prices/2024/01` would load all prices of January 2024 (dropping and recreating prices table)
+
+4. ### Query the data
+
+   To run queries:
+
    ```bash
    psql 'host=localhost user=client dbname=client password=client'
    ```
+
+   > If you don't have psql locally installed you can always use the one in CedarDB's container with
+   >
+   > ```bash
+   > docker exec -it cedar psql 'user=client dbname=client password=client'
+   > ```
+
+   
+
+   Here are some queries to start:
+
+   ```sql
+   select min(time)as first , max(time) as  last, count(*) as n_events from prices;
+   ```
+
+​	To check the prices chunk you've loaded
+
+
+
+If you want to continue with a more in depth exploration of the dataset you take a look at the [analysis](https://ludof63.github.io/MTSK-analysis/analysis/).
+
