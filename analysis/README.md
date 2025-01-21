@@ -1,24 +1,39 @@
-# Understanding MTS-K dataset
+# MTS-K dataset: analysis
 
-These are the core informations needed to start analysis the MTS-K dataset:
+MTS-K records the history of price changes for fuel stations in Germany. In this document we get started with a basic analysis, focusing on a point in time. While:
 
-- We can classify the stations in **Always-Open** stations and **Flex-Time** stations
+- an analysis of price updates frequencies can be found [here](updates_frequencies.md)
+- an analysis of fuel prices over time can be found [here](time-series_analysis.md)
+
+> The SQL code blocks are meant to be examples runnable with `psql`
+
+> When I refer to scripts they can be found in the folder `scripts/`, while SQL queries can be found in `sql/`
+
+## Starting Point
+
+As we will use mainly SQL for this analysis I suggest to take a look at the [schema](../sql/MTS-K_schema.sql) that consists in 3 tables:
+
+- **prices**: each entry is a price change for a certain fuels for a certain station
+- **stations**: information about fuel stations
+- **stations_times**: opening hours for each station
+
+Important notes:
+
+- **A price `p` for a fuel `f` at a certain station `s` is valid until the next (in time) price event for `f` for `s`.**
 - For a fuel `f` I should only consider the price events with `f_change IN (1,3)`. From now on when I refer to a price event I consider it a valid one.
-- A price `p` for a fuel `f` at a certain station `s` is valid until the next (in time) price event for f at s.
+- We can classify the stations in **Always-Open** stations and **Flex-Time** stations. The Flex-Time stations have entries in `station_times`
 
 
-
-Let's start by analyzing fuel prices at a point in time.
 
 ## Stations Open at a Certain Time: `OpenStationsAt`
 
-Let's *set the parameter `time`*, we will use it for the following queries
+Let's start by analyzing fuel prices at a point in time. We *set the parameter `time`* (psql variable),  we will use it for the following queries
 
 ```postgresql
 \set time '2024-11-01 12:00'
 ```
 
-In this first example we count count the open stations. To achieve that correctly, we have to differentiate between Always-Open and Flex-Time stations. Additionally, the  stations dataset is incremental, so there may be inactive stations in it. To avoid counting inactive stations we **consider active only the stations with an event in the previous 48 hours** (see updates frequency analysis).
+In this first example we count count the open stations. To achieve that correctly, we have to differentiate between Always-Open and Flex-Time stations. Additionally, the  stations dataset is incremental, so there may be inactive stations in it. To avoid counting inactive stations we **consider active only the stations with an event in the previous 48 hours** (see [updates frequency analysis](updates_frequencies.md)).
 
 ```postgresql
 WITH param AS (
@@ -108,7 +123,7 @@ Around 2% of the stations report outlier prices. While if we do not consider thi
 
 Now it would be interesting to plot the prices at a current time on the map of Germany. The stations are plot with a color base on their deviation from the mean, the mean doesn't consider outliers that are reported as black points.
 
-<iframe src="plots/prices_on_map.html" width="400" height="500" style="border: 1px solid #ccc;"></iframe>
+<iframe src="plots/prices_on_map.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
 > The map `prices_on_map.html` was generated using `prices_map.py` for `diesel` and `e5` at `2024-11-01 12:00:00` (the rendering of the html requires around 10s).
 >
@@ -170,7 +185,7 @@ from top_cities order by avg_price;
 
 After obtaining this first comparison between cities, we should ask ourselves what are we considering as a "city". Let's start by plotting the stations of each city on a map:
 
-<iframe src="plots/cities_map.html" width="400" height="500" style="border: 1px solid #ccc;"></iframe>
+<iframe src="plots/cities_map.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
 The map is generated using `cities_map.py` with the following query (`TopCitiesStations.sql`):
 
@@ -264,7 +279,7 @@ GROUP BY cluster ORDER BY n_stations DESC;
 
 And plot it on a map with python (`cluster_stations.py`).
 
-<iframe src="plots/stations_clusters.html" width="400" height="500" style="border: 1px solid #ccc;"></iframe>
+<iframe src="plots/stations_clusters.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
 While for isolated cities like Berlin and Nuremberg this is enough, we notice that there are clusters close too each other that we would like to "merge".
 
@@ -304,7 +319,7 @@ f"UPDATE {TMP_TABLE} SET cluster = '{leader_a} , {leader_b}' WHERE cluster = '{l
 
 The python code is in `cluster_stations.py`. And the clusters we obtain after the merging phase look like 
 
-<iframe src="plots/stations_clusters_merged.html" width="400" height="500" style="border: 1px solid #ccc;"></iframe>
+<iframe src="plots/stations_clusters_merged.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
 Assuming we store our final clusters' mappings in `stations_clusters`, we can extend `PriceAt` with a similar aggregation to the one for city names
 
@@ -345,5 +360,3 @@ from clusters order by avg_price;
 Where I limited the cluster label length to 50 chars , the only label cut also includes `Mönchengladbach, Duisburg, Krefeld, Düsseldorf, Wuppertal`. 
 
 We can observe how a city area generally has prices similar to those of the city center.
-
-## Average Price Over a Time Period

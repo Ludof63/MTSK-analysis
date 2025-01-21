@@ -15,7 +15,7 @@ QUERY="../sql/clustering/ClusterStations.sql"
 DST_THRESHOLD = 30
 PARAMS ={'dst_threshold' : f'{DST_THRESHOLD}'}
 
-TMP_TABLE="stations_clusters"
+TMP_TABLE="tmp_clusters"
 
 LIST_CLUSTERS ="""
 SELECT 
@@ -29,7 +29,8 @@ CLOSEST_CLUSTER = f"""
 WITH clusters_centers AS (
     SELECT cluster, COUNT(id) as n_stations, AVG(latitude) AS lat, AVG(longitude) AS lon,
     FROM {TMP_TABLE}, stations WHERE station_id = id GROUP BY cluster
-)
+),
+closest_clusters AS (
 SELECT 
     tc1.cluster as leader_a,
     tc2.cluster as leader_b,
@@ -48,9 +49,9 @@ SELECT
         )
     ) as dst,
 FROM  clusters_centers tc1, clusters_centers tc2
-WHERE tc1.cluster <> tc2.cluster ORDER BY dst ASC LIMIT 1;
-
-
+WHERE tc1.cluster <> tc2.cluster ORDER BY dst ASC LIMIT 1
+)
+SELECT * from closest_clusters where dst < 2 * {DST_THRESHOLD};
 """
 
 
@@ -115,13 +116,12 @@ def main():
 
     while True:
         res = run_query(CLOSEST_CLUSTER)
-        assert not res.empty
-
-        leader_a, leader_b, dst = res.loc[0]['leader_a'], res.loc[0]['leader_b'], res.loc[0]['dst']
-        if dst > 2 * DST_THRESHOLD:
+        if res.empty:
             print(f"END")
             break
 
+        leader_a, leader_b, dst = res.loc[0]['leader_a'], res.loc[0]['leader_b'], res.loc[0]['dst']
+            
         print(f"Merging {leader_b} into {leader_a}   ({dst})")
         execute_statement(f"UPDATE {TMP_TABLE} SET cluster = '{leader_a}, {leader_b}' WHERE cluster = '{leader_a}' OR cluster = '{leader_b}';")
 

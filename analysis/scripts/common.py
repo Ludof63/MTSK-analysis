@@ -31,7 +31,10 @@ def read_query(query_file : str, overwrite_f : List[Callable[[str],str]] = []) -
 
 def execute_statement(stmt : str):
      with pg.connect(f"host=localhost port={PORT} user={USER} password={USER_PSWD} dbname={DB}") as conn:
-        conn.execute(stmt) #type: ignore
+        with conn.cursor() as cur:
+            cur.execute(stmt) #type: ignore
+            print(f"Number of rows affected: {cur.rowcount}")
+            conn.commit()
 
 def run_query(query : str) -> pd.DataFrame:
     with pg.connect(f"host=localhost port={PORT} user={USER} password={USER_PSWD} dbname={DB}") as conn:
