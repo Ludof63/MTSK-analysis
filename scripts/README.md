@@ -49,3 +49,12 @@ Downloads in `data/`:
 
   For example, `./scripts/load.sh -p data/price`s works because `./data` is mounted at `/data` in CedarDB's container ([docker-compose.yml](../docker-compose.yml))
 
+## Alternative Runner
+
+You don't have docker-compose locally, you can still emulate the setup of docker compose with 
+
+```bash
+./scripts/runner.sh up
+```
+
+> If you want to use **podman** instead of docker, set the enviroment variable `USE_PODMAN` to any value
