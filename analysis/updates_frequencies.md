@@ -4,7 +4,7 @@ MTS-K records the history of price changes for fuel stations in Germany. One wou
 
 - How often are prices updated?
 
-- How does the update frequency vary over time?
+- How does the update frequency vary over time? I answer this (together with some other time-series analysis) [here](time-series.md).
 
 - How many updates per seconds are there on average?
 
@@ -108,14 +108,6 @@ SELECT p50, p75, p90, p95 FROM percentiles;
 ```
 
 The percentiles confirms that while most stations update relatively frequently, a small subset of stations have significantly longer update intervals. More than half of the stations update on average every 46 minutes or less. However, even considering p95 the prices are updates within 2 days (`2880 minutes`). Thus, we can consider 2 days a reasonable limit to consider a station inactive (accepting the loss of few outliers)
-
-
-
-## `UpdatesDist`: How does the update frequency vary over time?
-
-
-
-
 
 ## How many updates per second?
 
