@@ -9,12 +9,7 @@ services:
       - 5432:5432
     volumes:
       - ./data:/data
-      - cedardb_data:/var/lib/cedardb/data #make db persistent
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres -h 127.0.0.1 -p 5432"]
-      interval: 10s
-      timeout: 1s
-      retries: 10    
+      - cedardb_data:/var/lib/cedardb/data #make db persistent 
   grafana:
     container_name: grafana
     image: grafana/grafana:latest

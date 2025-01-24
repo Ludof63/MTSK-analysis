@@ -28,7 +28,7 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
    Assuming you have [CedarDB image locally](https://cedardb.com/docs/getting_started/running_docker_image/) as `cedardb` 
 
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
    Starts CedarDB and [Grafana](https://grafana.com/). You access Grafana at http://localhost:3000/ with username `admin` and password `admin`.
@@ -76,8 +76,6 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
    ```
 
 
-
-​	
 
 
 
