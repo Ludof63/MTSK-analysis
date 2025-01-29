@@ -26,6 +26,117 @@
         "type": "grafana-postgresql-datasource",
         "uid": "fdl2zuq913klcb"
       },
+      "description": "Fuel-Independent",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n    EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n    EXTRACT(EPOCH FROM (end_t - start_t)) AS number_seconds\n),\ntime_series AS (\n    SELECT  \n        start_t + ((i * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n        bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n        EXTRACT(dow FROM bucket_start) AS day_of_week, -- for day_bit\n        (CASE WHEN day_of_week = 0 THEN 6 ELSE day_of_week -1 END ) as day_bit --for flextime stations\n    FROM param, generate_series(0, (param.number_seconds / param.interval_seconds)) AS i\n),\nflextime_buckets AS(\n    SELECT\n        bucket_start, station_id, bucket_start::date + open_time as from , bucket_end::date + close_time as to\n    FROM param, time_series, stations_times, stations s\n    WHERE station_id = id AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n        AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN param.start_t AND param.end_t)-- avoid inactive stations\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, id as station_id, bucket_start as from , bucket_end as to\n    FROM param, time_series, stations s WHERE always_open AND first_active <= bucket_start\n    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN param.start_t AND param.end_t)-- avoid inactive stations\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n)\nselect bucket_start as datetime, COUNT(station_id) as n_open_stations from stations_time_series\ngroup by bucket_start\norder by  bucket_start;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Number of Open Stations Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "description": "Fuel-Independent",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -97,7 +208,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 0
       },
       "id": 2,
@@ -142,6 +253,19 @@
       ],
       "title": "Number of Updates Over Time",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 4,
+      "panels": [],
+      "title": "Price Average Over Time",
+      "type": "row"
     },
     {
       "datasource": {
@@ -204,10 +328,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
+        "h": 7,
+        "w": 10,
+        "x": 0,
+        "y": 9
       },
       "id": 1,
       "options": {
@@ -254,6 +378,226 @@
         }
       ],
       "title": "Wrong Average Over Time",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "description": "Fuel-Dependent",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 14,
+        "x": 10,
+        "y": 9
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n    EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n    EXTRACT(EPOCH FROM (end_t - start_t)) AS number_seconds\n),\ntime_series AS (\n    SELECT  \n        start_t + ((i * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n        bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n        EXTRACT(dow FROM bucket_start) AS day_of_week, -- for day_bit\n        (CASE WHEN day_of_week = 0 THEN 6 ELSE day_of_week -1 END ) as day_bit --for flextime stations\n    FROM param, generate_series(0, (param.number_seconds / param.interval_seconds)) AS i\n),\nstations_info AS(\n    SELECT s.id as station_id, city, brand, always_open FROM stations s, param\n    WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN param.start_t AND param.end_t)-- avoid inactive stations\n    --and always_open -- and city = 'Berlin'\n),\nstations_prices AS (\n   SELECT time as valid_from, diesel as price, s.*\n    FROM param, prices p, stations_info s\n    WHERE s.station_id = p.station_uuid\n    AND diesel_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.*     --add last event before start\n    FROM param, stations_info s, (\n        SELECT time as valid_from, diesel as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND diesel_change IN (1,3)\n        AND time <= param.start_t AND time >= param.start_t - '2 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(bucket_start, valid_until) - GREATEST(bucket_end, valid_from))) as duration_seconds, p_int.*\n    FROM  time_series ts, prices_intervals p_int,\n    WHERE (valid_from,valid_until) OVERLAPS (bucket_start, bucket_end)\n)\nselect bucket_start as datetime, SUM(price * duration_seconds) / SUM(duration_seconds) as avg_diesel_price,\nfrom prices_time_series\ngroup by datetime\norder by datetime;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Time-Weighted Price Average Over Time with Uniform Stations",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "description": "Fuel-Dependent",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 18,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n    EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n    EXTRACT(EPOCH FROM (end_t - start_t)) AS number_seconds\n),\ntime_series AS (\n    SELECT  \n        start_t + ((i * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n        bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n        EXTRACT(dow FROM bucket_start) AS day_of_week, -- for day_bit\n        (CASE WHEN day_of_week = 0 THEN 6 ELSE day_of_week -1 END ) as day_bit --for flextime stations\n    FROM param, generate_series(0, (param.number_seconds / param.interval_seconds)) AS i\n),\nflextime_buckets AS(\n    SELECT\n        bucket_start, station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM param, time_series, stations_times, stations s\n    WHERE station_id = id AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n        AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN param.start_t AND param.end_t)-- avoid inactive stations\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, id as station_id, bucket_start as from_t , bucket_end as to_t\n    FROM param, time_series, stations s WHERE always_open AND first_active <= bucket_start\n    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN param.start_t AND param.end_t)-- avoid inactive stations\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_info AS(\n    SELECT s.id as station_id, city, brand, always_open FROM stations s, param\n    WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN param.start_t AND param.end_t)-- avoid inactive stationsù\n    --and always_open -- and city = 'Berlin'\n),\nstations_prices AS (\n   SELECT time as valid_from, diesel as price, s.*\n    FROM param, prices p, stations_info s\n    WHERE s.station_id = p.station_uuid\n    AND diesel_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.*\n    FROM param, stations_info s, (\n        SELECT time as valid_from, diesel as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND diesel_change IN (1,3)\n        AND time <= param.start_t AND time >= param.start_t - '2 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), --add last event before start\nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t) --AND station_id = '12e6b614-87d4-4413-afd2-7dd783505ee8'\n)\nselect bucket_start as datetime, SUM(price * duration_seconds) / SUM(duration_seconds) as avg_diesel_price,\nfrom prices_time_series\ngroup by datetime\norder by datetime;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Time-Weighted Price Average Over Time",
       "type": "timeseries"
     }
   ],
@@ -319,13 +663,13 @@
     ]
   },
   "time": {
-    "from": "2024-09-30T22:00:00.000Z",
-    "to": "2024-10-31T22:59:59.000Z"
+    "from": "2024-01-21T23:00:00.000Z",
+    "to": "2024-01-28T22:59:59.000Z"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Time-Series Analysis",
   "uid": "eearom40cn400d",
-  "version": 4,
+  "version": 3,
   "weekStart": ""
 }

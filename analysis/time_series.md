@@ -70,7 +70,7 @@ However, when we group by day, we can smooth this effect, however we should stil
 
 We start by looking at the second one, by analyzing the opening times (number of open stations) over a certain period
 
-### Open Station Over Time
+### Open Stations Over Time
 
 Let's consider, as an example, the second week in October 2024:
 
