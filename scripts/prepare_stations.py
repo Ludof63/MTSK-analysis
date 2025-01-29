@@ -193,15 +193,18 @@ def prepare_stations(stations_dataset :str, plz_region_file : str,  output :str)
 
 
     
+    last_row = None
     with open(tmp_out_file,'w+') as outfile:
         writer = csv.DictWriter(outfile, fieldnames=STATIONS_HEADER)
         writer.writeheader()
 
         invalid_plz_unknown_city : list[RowType] = [] 
         invalid_coord : list[RowType] = []
+
         with open(stations_dataset, mode='r', newline='') as infile:
             reader = csv.DictReader(infile) 
             for row in reader:
+                last_row = row
                 plz = row['post_code']
                 city = row['city']
 
@@ -266,6 +269,8 @@ def prepare_stations(stations_dataset :str, plz_region_file : str,  output :str)
                 print(to_str_1(s)) 
 
     os.replace(tmp_out_file,output)
+    if last_row:
+        print(f"Last station insert in dataset active from {last_row['first_active']}")
 
 
 def main():

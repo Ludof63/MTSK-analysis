@@ -38,7 +38,7 @@ Running in the root of the repository
 downloads an up-to-date original stations dataset in `data/stations_original.csv` and plz-dataset in `data/zuordnung_plz_ort.csv`, that we can prepare with
 
 ```bash
-python scripts/data_prep/clear_stations.py data/stations_original.csv data/zuordnung_plz_ort.csv
+python scripts/prepare_stations.py data/stations_original.csv data/zuordnung_plz_ort.csv
 ```
 
 this saves the results in `data/stations.csv` and `data/stations_times.csv` (overriding the preprepared station dataset that comes with the repository)

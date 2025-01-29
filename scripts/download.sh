@@ -27,18 +27,18 @@ plz_info="zuordnung_plz_ort.csv"
 plz_5stellig="plz-5stellig.shp.zip"
 
 # -------------------------------------------------
-download_stations=false
-download_prices=false
+download_stations=0
+download_prices=0
 while getopts "sp:" opt; do
     case "$opt" in
-        s) download_stations=true ;;
+        s) 
+            download_stations=1 
+            ;;
         p)
-            download_prices=true
+            download_prices=1
             start_date=${OPTARG}
-            echo "Start date $start_date"
             shift $((OPTIND -1))
             end_date=$1
-            echo "End date $end_date"
             ;;
             
         *) 
@@ -57,31 +57,37 @@ validate_year_month() {
     fi
 }
 
-if [[ $download_prices -eq 1 && -z "$start_date" || -z "$end_date" ]]; then
+if [[ $download_prices -eq 1 ]] && [[ -z "$start_date" || -z "$end_date" ]]; then
     echo "Error: -p requires both <year/mm start> and <year/mm end>."
     exit 1
 fi
 
-validate_year_month $start_date
-validate_year_month $end_date   
-
-# Ensure start < end
-if [[ $(date -d "$start_date/01" +%s) -gt $(date -d "$end_date/01" +%s) ]]; then
-    echo "Error: Start date ($start_date) must be earlier than end date ($end_date)."
-    exit 1
+if [[ $download_prices -eq 1 ]]; then
+    validate_year_month $start_date
+    validate_year_month $end_date  
 fi
+
+ 
+if [[ $download_prices -eq 1 ]]; then
+    if [[ $(date -d "$start_date/01" +%s) -gt $(date -d "$end_date/01" +%s) ]]; then
+        echo "Error: Start date ($start_date) must be earlier than end date ($end_date)."
+        exit 1
+    fi 
+fi
+
 
 
 
 set +x
 mkdir -p $OUTPUT_FOLDER
 
-if $download_stations; then
+if [[ $download_stations -eq 1 ]]; then
+    echo "Downloading Stations Dataset -> $station_file"
     curl -L -o "${OUTPUT_FOLDER}/${file_station_out}" "https://dev.azure.com/${org}/${repo}/_apis/git/repositories/${repo}/items?path=${station_path}"
     curl -L -o "${OUTPUT_FOLDER}/${plz_info}" "${base_url}/${plz_info}"
 fi
 
-if $download_prices; then
+if [[ $download_prices -eq 1 ]]; then
     prices_folder="${OUTPUT_FOLDER}/${folder_prices_out}"
     mkdir -p $prices_folder
 
