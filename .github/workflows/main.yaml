@@ -1,0 +1,38 @@
+name: Weekly Prepare New Stations Dataset
+on: push
+
+# on:
+#   schedule:
+#     - cron: "0 0 * * 0" # Runs every Sunday at midnight (UTC)
+#   workflow_dispatch: # You can manually trigger it as well
+
+jobs:
+  update-files:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.x"
+      
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Download Newest Stations Dataset
+        run: bash ./scripts/download.sh -s
+      
+      - name: Prepare Stations Dataset
+        run: python scripts/prepare_stations.py data/stations_original.csv data/zuordnung_plz_ort.csv
+
+      - name: Add new data
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/stations.csv data/stations_times.csv
+          git commit -m "weekly update of stations dataset"
+          git push
