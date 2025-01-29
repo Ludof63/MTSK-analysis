@@ -16,16 +16,18 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
 1. ### Download the Dataset
 
    ```bash
-   ./scripts/download.sh -p
+   ./scripts/download.sh -p 2024/01 2024/12
    ```
 
-   Will download the prices changes dataset. By default it downloads entire 2024 (around 13 GB), but you can change that in the script. This repository contains already a prepared version of the gas stations dataset with their prices in `data/`. 
+   Will download the prices updates dataset for the months from 2024/01 to 2024/12, both extremes included (around 13 GB uncompressed). 
+
+   This repository contains already a prepared version of the gas stations dataset with their prices in `data/`. 
 
    > If you wanted to work on prices after 21/01/2025 you need to download an up-to-date stations dataset and prepare it ( see `scripts/data_preparation.md`).
 
 2. ### Start the Database
 
-   Assuming you have [CedarDB image locally](https://cedardb.com/docs/getting_started/running_docker_image/) as `cedardb` 
+   Assuming you have [CedarDB image locally](https://cedardb.com/docs/getting_started/running_docker_image/) as `cedardb`. Running
 
    ```bash
    docker compose up -d
@@ -33,12 +35,12 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
 
    Starts CedarDB and [Grafana](https://grafana.com/). You access Grafana at http://localhost:3000/ with username `admin` and password `admin`.
 
-   > You can stop both with `docker-compose down`. By default the database is persisted with a docker volume, if you want a fresh start run `docker-compose down -v`
+   > You can stop the containers with `docker compose down`. By default the database is persisted with a docker volume, if you want a fresh start run `docker compose down -v` to remove the volumes
 
 3. ### Load the data
 
    ```bash
-   ./scripts/load.sh -c -s -p data/prices
+   ./scripts/load.sh -c -s -p 2024/01 2024/06
    ```
 
    This will:
@@ -47,13 +49,23 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
 
    - load stations and stations times (opening hours for each stations) from data (`-s`)
 
-   - load all prices in `data/prices` and its subfolders. (`-p data/prices`).
+   - load all prices in `data/prices` (and subfolders) between 2024/01/01 (included) and 2024/06/01 (not included) (`-p 2024/01 2024/06`).
 
-     >  This can take a while if you've downloaded the whole 2024
+     >  The loading of the prices can take a while based on the chunk you're loading
 
-     > If you want to load less data you can specify a subfolder, e.g., `./scripts/load.sh -p data/prices/2024/01` would load all prices of January 2024 (dropping and recreating prices table)
+4. ### Replay Transactional Workload (`optional`)
 
-4. ### Query the data
+   This step is optional, as you can already run queries on the loaded data. In this step we start a python client that replays the remaining part of the dataset as a series of inserts. You can start it with
+
+   ```bash
+   docker compose run -it --rm --name replayer replayer -p /data -s 60
+   ```
+
+   If for example you've downloaded the entire 2024 and loaded until 2024/06/01 (not included), this will simulate the insertion of all price updates starting from 2024/06/01 with a factor speed of 60 (`-s 100`), executing every second one minute of transactions.
+
+   > If you don't have docker compose take a look [here](scripts/replay/README.md), to see alternative ways of starting replayer 
+
+5. ### Query the data
 
    To run queries:
 

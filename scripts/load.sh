@@ -7,22 +7,29 @@ PATH_TO_TIMES="/data/stations_times.csv"
 
 PRICES_TABLE=prices
 STATIONS_TABLE=stations
-CLUSTERS_TABLE=stations_clusters
 TIMES_TABLE=stations_times
+
+PRICES_DIR="/data/prices"
 
 CONTAINER=cedar
 
 do_create=0
 do_stations=0
 do_prices=0
-prices_dir=""
 
 usage() {
-    echo "Usage: $0 [-c] [-s] [-p <prices_dir>] [-o]"
+    echo "Usage: $0 [-c] [-s] [-p  <year/mm> <year/mm> ] [-o]"
     echo "  -c              creates schema from $PATH_TO_SCHEMA"
     echo "  -s              loads stations from $PATH_TO_STATIONS and $PATH_TO_TIMES "
-    echo "  -p <prices_dir> loads prices from <prices_dir>"
+    echo "  -p <year/mm start> <year/mm end> loads prices from $PRICES_DIR from start to end"
     exit 1
+}
+
+validate_year_month() {
+    if [[ ! $1 =~ ^[0-9]{4}/(0[1-9]|1[0-2])$ ]]; then
+        echo "Error: Invalid date format '$1'. Expected 'year/mm'"
+        exit 1
+    fi
 }
 
 
@@ -34,7 +41,7 @@ source .env
 CONN_STR="host=localhost user=$CEDAR_USER dbname=$CEDAR_DB password=$CEDAR_PASSWORD"
 
 
-while getopts ":cp:so" opt; do
+while getopts ":csp:o" opt; do
     case $opt in
         c)
             do_create=1
@@ -44,7 +51,11 @@ while getopts ":cp:so" opt; do
             ;;
         p)
             do_prices=1
-            prices_dir="$OPTARG"
+            start_date=${OPTARG}
+            echo "Start date $start_date"
+            shift $((OPTIND -1))
+            end_date=$1
+            echo "End date $end_date"
             ;;
         o)
             CONTAINER=postgres
@@ -59,6 +70,20 @@ while getopts ":cp:so" opt; do
             ;;
     esac
 done
+
+if [[ $do_prices -eq 1 && -z "$start_date" || -z "$end_date" ]]; then
+    echo "Error: -p requires both <year/mm start> and <year/mm end>."
+    usage
+fi
+
+validate_year_month $start_date
+validate_year_month $end_date   
+
+# Ensure start < end
+if [[ $(date -d "$start_date/01" +%s) -gt $(date -d "$end_date/01" +%s) ]]; then
+    echo "Error: Start date ($start_date) must be earlier than end date ($end_date)."
+    exit 1
+fi
 
 
 #--------------------------------------------------------------------
@@ -109,6 +134,10 @@ recreate_table(){
 }
 
 
+
+
+
+#--------------------------------------------------------------------
 if [[ ! -e "$PATH_TO_SCHEMA" ]]; then
     echo "Cannot continue without $PATH_TO_SCHEMA"
     exit 1
@@ -143,10 +172,17 @@ fi
 
 #prices ----------------------------------------
 if [[ "$do_prices" -eq 1 ]]; then
+    echo "Loading from $start_date/01 to $end_date/01"
+
     recreate_table $PRICES_TABLE
 
-    run_cmd find "/$prices_dir" -type f -name "*-prices.csv" | sort | while read -r file; do
-        query="copy $PRICES_TABLE from '$file' with(format csv, delimiter ',', null '', header true);"
-        execute_query "$query"
+    run_cmd find "$PRICES_DIR" -type f -name "*-prices.csv" | sort | while read -r file; do
+        file_date=$(basename "$file" | cut -d'-' -f1-3)
+
+        if [[ $(date -d "$file_date" +%s) -ge $(date -d "$start_date/01" +%s) && $(date -d "$file_date" +%s) -lt $(date -d "$end_date/01" +%s) ]]; then
+            query="copy $PRICES_TABLE from '$file' with(format csv, delimiter ',', null '', header true);"
+            execute_query "$query"
+        fi
+
     done
 fi

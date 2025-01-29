@@ -24,6 +24,18 @@ services:
       - ./grafana:/etc/grafana/provisioning #to preload configs in grafana
       - grafana_data:/var/lib/grafana #to persist grafana data
 
+  replayer:
+    build:
+      context: ./scripts/replay
+    image: replay-app
+    profiles:
+      - manual
+    network_mode: "host"
+    env_file: .env
+    volumes:
+      - ./data/prices:/data #prices folder mapped to /data
+    pull_policy: build 
+
 volumes:
   cedardb_data:
     name: cedardb_data   
