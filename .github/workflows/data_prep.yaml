@@ -1,4 +1,4 @@
-name: Weekly Prepare Stations Dataset
+name: Weekly Prepare New Stations Dataset
 
 on:
   schedule:
@@ -19,4 +19,4 @@ jobs:
           python-version: "3.x"
 
       - name: Run download.sh to get files
-        run: bash download.sh -s
+        run: bash ./scripts/download.sh -s
