@@ -7,31 +7,17 @@ import psycopg as pg
 
 
 DEFUALT_PRICES_FOLDER= "../../data/prices"
-DEFAULT_SPEED_FACTOR = 10
+DEFAULT_SPEED_FACTOR = 1
 
 PRICES_TABLE="prices"
 PORT=5432
 
 
-ENV_FILE=".env"
-
-def read_env_file(file_path):
-    env_vars = {}
-    with open(file_path, 'r') as file:
-        for line in file:
-            line = line.strip()
-            if line and not line.startswith('#'):
-                key, value = line.split('=', 1)
-                env_vars[key.strip()] = value.strip()
-    return env_vars
-
-
 USER, USER_PSWD, DB = os.getenv('CEDAR_USER'),os.getenv('CEDAR_PASSWORD'), os.getenv('CEDAR_DB')
 if not all([USER,USER_PSWD, DB]):
-    raise RuntimeError("Not implemented")
-    env_vars = read_env_file('.env')
-    USER, USER_PSWD, DB = env_vars['CEDAR_USER'],  env_vars['CEDAR_PASSWORD'], env_vars['CEDAR_DB']
-
+    print("Missing env variables")
+    exit(1)
+    
 
 CONN_STR = f"host=localhost port={PORT} user={USER} password={USER_PSWD} dbname={DB}"
 
@@ -56,13 +42,12 @@ def transactional_workload(files : list[str], speed_factor : int):
 
     print(f"Starting Worload from {base_time} with speed factor {speed_factor}X")
 
-    start_wall_time = time.time()
-    current_time = base_time
-
+    real_start_time = time.time()
+    current_time = base_time #fake time (in the past)
 
     with pg.connect(CONN_STR) as conn:
         for file in files:
-            print(f"Reading Insert from {file}")
+            print(f"Reading file: {file}")
             with open(file, 'r') as f:
                 reader = DictReader(f)
 
@@ -78,16 +63,17 @@ def transactional_workload(files : list[str], speed_factor : int):
                                 conn.execute(insert_row(entry))  # type: ignore
                             conn.commit()
                             
-                            print(f"Inserted {len(to_insert)} rows for time {current_time}.")
+                            print(f"Inserted {len(to_insert)} updates with time in ({current_time}, {row_time}]")
                             to_insert.clear()
 
-                        current_time = row_time
+                        current_time = row_time #move time to next row time
 
                         
-                        elapsed = time.time() - start_wall_time
-                        time_to_sleep = ((current_time - base_time).total_seconds() / speed_factor) - elapsed
+                        elapsed_real = time.time() - real_start_time
+                        elapsed_fake = (current_time - base_time).total_seconds() 
+                        time_to_sleep = (elapsed_fake / speed_factor) - elapsed_real
                         if time_to_sleep > 0:
-                            #print(f"To sleep {time_to_sleep}")
+                            print(f"Elapsed fake: {elapsed_fake}, Elapsed real: {elapsed_real}, -> sleep for {round(time_to_sleep,4)}s\n")
                             time.sleep(time_to_sleep)
 
                         to_insert.append(row)

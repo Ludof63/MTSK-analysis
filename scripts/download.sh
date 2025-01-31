@@ -65,10 +65,7 @@ fi
 if [[ $download_prices -eq 1 ]]; then
     validate_year_month $start_date
     validate_year_month $end_date  
-fi
 
- 
-if [[ $download_prices -eq 1 ]]; then
     if [[ $(date -d "$start_date/01" +%s) -gt $(date -d "$end_date/01" +%s) ]]; then
         echo "Error: Start date ($start_date) must be earlier than end date ($end_date)."
         exit 1

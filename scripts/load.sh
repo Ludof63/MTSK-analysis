@@ -41,8 +41,8 @@ source .env
 CONN_STR="host=localhost user=$CEDAR_USER dbname=$CEDAR_DB password=$CEDAR_PASSWORD"
 
 
-while getopts ":csp:o" opt; do
-    case $opt in
+while getopts "csp:o" opt; do
+    case "$opt" in
         c)
             do_create=1
             ;;
@@ -61,28 +61,26 @@ while getopts ":csp:o" opt; do
             CONTAINER=postgres
             echo "Using use postgres -> container: $CONTAINER"
             ;;
-        ?)
-            echo "Invalid option"
-            usage
-            ;;
         *)
             usage
             ;;
     esac
 done
 
-if [[ $do_prices -eq 1 && -z "$start_date" || -z "$end_date" ]]; then
-    echo "Error: -p requires both <year/mm start> and <year/mm end>."
+if [[ $do_prices -eq 1 ]] && [[ -z "$start_date" || -z "$end_date" ]]; then
+    echo "Error: -p requires both <year/mm start> and <year/mm end>"
     usage
 fi
 
-validate_year_month $start_date
-validate_year_month $end_date   
+if [[ $do_prices -eq 1 ]]; then
+    validate_year_month $start_date
+    validate_year_month $end_date   
 
-# Ensure start < end
-if [[ $(date -d "$start_date/01" +%s) -gt $(date -d "$end_date/01" +%s) ]]; then
-    echo "Error: Start date ($start_date) must be earlier than end date ($end_date)."
-    exit 1
+    # Ensure start < end
+    if [[ $(date -d "$start_date/01" +%s) -gt $(date -d "$end_date/01" +%s) ]]; then
+        echo "Error: Start date ($start_date) must be earlier than end date ($end_date)."
+        exit 1
+    fi
 fi
 
 
