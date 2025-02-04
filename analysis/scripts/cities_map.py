@@ -5,8 +5,10 @@ import folium, random
 
 OUTPUT_FILENAME="cities_map.html"
 
-QUERY="../sql/TopCitiesStations.sql"
-
+QUERY="""
+    SELECT city, AVG(latitude) AS lat, AVG(longitude) AS lon,
+    FROM stations GROUP BY city HAVING COUNT(*) > 30
+    """
 
 
 def plot():

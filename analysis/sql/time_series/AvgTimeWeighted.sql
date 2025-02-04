@@ -1,7 +1,7 @@
 WITH param AS (
     SELECT
-    '2024-10-07T00:00:00Z'::TIMESTAMP AS start_t,
-    '2024-10-13T23:59:59Z'::TIMESTAMP AS end_t,
+    '2024-01-08T00:00:00Z'::TIMESTAMP AS start_t,
+    '2024-01-21T23:59:59Z'::TIMESTAMP AS end_t,
     '1 hour'::INTERVAL AS time_granularity,
     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
     EXTRACT(EPOCH FROM (end_t - start_t)) AS number_seconds
@@ -66,16 +66,3 @@ select bucket_start as datetime, SUM(price * duration_seconds) / SUM(duration_se
 from prices_time_series
 group by datetime
 order by datetime;
-
-
-
-
-
-
-
-
-
-
--- COUNT(DISTINCT ts.station_id) active_stations -- ts.station_id, price, GREATEST(from_t, valid_from) as from_t, LEAST(to_t, valid_until)  as to_t,
--- group by bucket_start
--- order by bucket_start;

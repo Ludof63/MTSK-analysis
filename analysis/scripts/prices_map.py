@@ -9,12 +9,12 @@ from folium.plugins import MarkerCluster
 OUTPUT_FILENAME="prices_on_map.html"
 VALUE_COL="price"
 
-TIME = '2024-11-01 12:00'
+TIME = '2024-06-02 06:53:56'
 PARAMS ={'time' : TIME}
 
 GRANULARITY_COLOR_AGGREGATE=10
-AGGREGATE_UNTIL_ZOOM = 9
-FUELS_TO_PLOT= ['diesel', 'e5']
+AGGREGATE_UNTIL_ZOOM = 6
+FUELS_TO_PLOT= ['diesel']
 
 
 COLORMAP = cm.LinearColormap(colors=['green', 'yellow', 'red'], vmin=-3, vmax=3)

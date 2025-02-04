@@ -4,66 +4,33 @@ import argparse
 #plotting
 import folium, random
 
-DO_PLOT_CLUSTERS= False
-OUTPUT_CLUSTERS="stations_clusters.html"
+DO_PARTIAL = False
+DO_PLOT = True
 
-DO_PLOT_CLUSTERS_MERGED = False
-OUTPUT_CLUSTERS_MERGED="stations_clusters_merged.html"
+OUTPUT_PARTIAL="stations_clusters_partial.html"
+QUERY_PARTIAL="../sql/clustering/PartialCluster.sql"
 
+OUTPUT_COMPLETE="stations_clusters.html"
+QUERY_COMPLETE="../sql/clustering/ClusterStations.sql"
 
-QUERY="../sql/clustering/ClusterStations.sql"
-DST_THRESHOLD = 30
-PARAMS ={'dst_threshold' : f'{DST_THRESHOLD}'}
-
-TMP_TABLE="tmp_clusters"
+TABLE="stations_clusters"
 
 LIST_CLUSTERS ="""
-SELECT 
-    cluster, COUNT(id) as n_stations,
-	ARRAY_AGG(latitude) AS lats, ARRAY_AGG(longitude) AS lons,
-FROM {table}, stations WHERE station_id = id
-GROUP BY cluster ORDER BY n_stations DESC;
-"""
-
-CLOSEST_CLUSTER = f"""
-WITH clusters_centers AS (
-    SELECT cluster, COUNT(id) as n_stations, AVG(latitude) AS lat, AVG(longitude) AS lon,
-    FROM {TMP_TABLE}, stations WHERE station_id = id GROUP BY cluster
-),
-closest_clusters AS (
-SELECT 
-    tc1.cluster as leader_a,
-    tc2.cluster as leader_b,
-    (
-        2 * 6371 * ATAN2(
-            SQRT(
-                POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +
-                COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *
-                POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)
-            ),
-            SQRT(1 - (
-                POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +
-                COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *
-                POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)
-            ))
-        )
-    ) as dst,
-FROM  clusters_centers tc1, clusters_centers tc2
-WHERE tc1.cluster <> tc2.cluster ORDER BY dst ASC LIMIT 1
-)
-SELECT * from closest_clusters where dst < 2 * {DST_THRESHOLD};
-"""
+    SELECT cluster, COUNT(id) as n_stations, ARRAY_AGG(latitude) AS lats, ARRAY_AGG(longitude) AS lons,
+    FROM {table}, stations WHERE station_id = id
+    GROUP BY cluster ORDER BY n_stations DESC;
+    """
 
 
 def insert_create_table(q : str) -> str:
-    return f"CREATE TABLE {TMP_TABLE} AS " + q
+    return f"CREATE TABLE {TABLE} AS " + q
 
 def insert_list_cluster(q : str) -> str:
     return q.replace("select * from clusters", LIST_CLUSTERS.format(table="clusters"))
 
 
 def plot_clusters(output_file : str):
-    df = run_query(transform_query(LIST_CLUSTERS.format(table=TMP_TABLE)))
+    df = run_query(transform_query(LIST_CLUSTERS.format(table=TABLE)))
     print(f"Query done | Available columns: {df.columns}")
 
     generated_colors = set()
@@ -98,7 +65,8 @@ def plot_clusters(output_file : str):
     print(f"Map saved in {output_file}")
 
 def export_clusters(outfile : str):
-    run_query(f"SELECT * from {TMP_TABLE};").to_csv(outfile,index=False)
+    run_query(f"SELECT * from {TABLE};").to_csv(outfile,index=False)
+
 
 def main():  
     parser = argparse.ArgumentParser(description="Parse an optional -e <file_path> argument.")
@@ -107,26 +75,13 @@ def main():
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    #create clusters
-    execute_statement(f"DROP TABLE IF EXISTS {TMP_TABLE};")
-    execute_statement(read_query(QUERY,[insert_create_table,insert_params_gen(PARAMS)]))
-    
-    if DO_PLOT_CLUSTERS:
-        plot_clusters(OUTPUT_CLUSTERS)
+    execute_statement(f"DROP TABLE IF EXISTS {TABLE};")
+    query_file = QUERY_PARTIAL if DO_PARTIAL else QUERY_COMPLETE
+    execute_statement(read_query(query_file,[insert_create_table]))
 
-    while True:
-        res = run_query(CLOSEST_CLUSTER)
-        if res.empty:
-            print(f"END")
-            break
-
-        leader_a, leader_b, dst = res.loc[0]['leader_a'], res.loc[0]['leader_b'], res.loc[0]['dst']
-            
-        print(f"Merging {leader_b} into {leader_a}   ({dst})")
-        execute_statement(f"UPDATE {TMP_TABLE} SET cluster = '{leader_a}, {leader_b}' WHERE cluster = '{leader_a}' OR cluster = '{leader_b}';")
-
-    if DO_PLOT_CLUSTERS_MERGED:
-        plot_clusters(OUTPUT_CLUSTERS_MERGED)
+    if DO_PLOT:
+        plot_file = OUTPUT_PARTIAL if DO_PARTIAL else OUTPUT_COMPLETE
+        plot_clusters(plot_file)
     
     if args.export:
         export_clusters(args.export)
