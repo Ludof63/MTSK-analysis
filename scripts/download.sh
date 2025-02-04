@@ -109,5 +109,3 @@ if [[ $download_prices -eq 1 ]]; then
         current_date=$(date -d "$current_date/01 + 1 month" +%Y/%m)
     done
 fi
-
-

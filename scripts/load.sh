@@ -162,7 +162,7 @@ if [[ "$do_stations" -eq 1 ]]; then
     #times table
     if file_exists $PATH_TO_TIMES; then
         recreate_table $TIMES_TABLE
-        execute_query "copy $TIMES_TABLE from '$PATH_TO_TIMES' with(format csv, delimiter ',', null '', header true);"
+        execute_query "copy $TIMES_TABLE from '$PATH_TO_TIMES' with(format text, delimiter ',', null '', header);"
     else
         echo "File not found $PATH_TO_TIMES -> doing nothing"
     fi
@@ -178,8 +178,7 @@ if [[ "$do_prices" -eq 1 ]]; then
         file_date=$(basename "$file" | cut -d'-' -f1-3)
 
         if [[ $(date -d "$file_date" +%s) -ge $(date -d "$start_date/01" +%s) && $(date -d "$file_date" +%s) -lt $(date -d "$end_date/01" +%s) ]]; then
-            query="copy $PRICES_TABLE from '$file' with(format csv, delimiter ',', null '', header true);"
-            execute_query "$query"
+            execute_query "copy $PRICES_TABLE from '$file' with(format text, delimiter ',', null '', header);"
         fi
 
     done

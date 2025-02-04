@@ -1,7 +1,7 @@
 import os
 import time
 from csv import DictReader
-from datetime import datetime
+from datetime import datetime, timezone
 import argparse
 import psycopg as pg 
 
@@ -34,20 +34,14 @@ def insert_row(row : dict[str,str]) -> str:
         """
 
 
-def transactional_workload(files : list[str], speed_factor : int):
+def transactional_workload(files : list[str], speed_factor : int, start_time : datetime):
     print(f"Similating Workload: from {files[0]} to {files[-1]}")   
-    with open(files[0], 'r') as f:
-        reader = DictReader(f)
-        base_time = datetime.fromisoformat(next(reader)['date'])
 
-    print(f"Starting Worload from {base_time} with speed factor {speed_factor}X")
-
-    real_start_time = time.time()
-    current_time = base_time #fake time (in the past)
-
+    start_time = start_time.replace(tzinfo=timezone.utc)
+    found_start = False
     with pg.connect(CONN_STR) as conn:
         for file in files:
-            print(f"Reading file: {file}")
+            print(f"\nReading file: {file}")
             with open(file, 'r') as f:
                 reader = DictReader(f)
 
@@ -55,33 +49,40 @@ def transactional_workload(files : list[str], speed_factor : int):
                 for row in reader:
                     row_time = datetime.fromisoformat(row['date'])
 
-                    if row_time <= current_time:
-                        to_insert.append(row)
+                    if not found_start:
+                        if row_time > start_time:
+                            found_start = True
+                            base_time = row_time
+                            current_time = row_time
+                            real_start_time = time.time()
+                            print(f"Starting Worload from {current_time}  with speed factor {speed_factor}X")
                     else:
-                        if len(to_insert) > 0:
-                            for entry in to_insert:
-                                conn.execute(insert_row(entry))  # type: ignore
-                            conn.commit()
+                        if row_time <= current_time:
+                            to_insert.append(row)
+                        else:
+                            if len(to_insert) > 0:
+                                for entry in to_insert:
+                                    conn.execute(insert_row(entry))  # type: ignore
+                                conn.commit()
+                                
+                                print(f"Inserted {len(to_insert)} updates at {current_time}")
+                                to_insert.clear()
+
+                            current_time = row_time #move time to next row time
+
                             
-                            print(f"Inserted {len(to_insert)} updates with time in ({current_time}, {row_time}]")
-                            to_insert.clear()
+                            elapsed_real = time.time() - real_start_time
+                            elapsed_fake = (current_time - base_time).total_seconds() 
+                            time_to_sleep = (elapsed_fake / speed_factor) - elapsed_real
+                            if time_to_sleep > 0:
+                                print(f"Elapsed fake: {elapsed_fake}, Elapsed real: {elapsed_real}, -> sleep for {round(time_to_sleep,4)}s\n")
+                                time.sleep(time_to_sleep)
 
-                        current_time = row_time #move time to next row time
-
-                        
-                        elapsed_real = time.time() - real_start_time
-                        elapsed_fake = (current_time - base_time).total_seconds() 
-                        time_to_sleep = (elapsed_fake / speed_factor) - elapsed_real
-                        if time_to_sleep > 0:
-                            print(f"Elapsed fake: {elapsed_fake}, Elapsed real: {elapsed_real}, -> sleep for {round(time_to_sleep,4)}s\n")
-                            time.sleep(time_to_sleep)
-
-                        to_insert.append(row)
+                            to_insert.append(row)
 
                 for entry in to_insert:
                     conn.execute(insert_row(entry))  # type: ignore
                 conn.commit()
-                print(f"Processed file: {file}")
 
     print("Transactional workload simulation finished")
 
@@ -98,18 +99,22 @@ def main():
         with conn.cursor() as cur:
             record = cur.execute("select max(time) from prices;").fetchone()
 
-    max_time = record[0].strftime("%Y-%m-%d") if record else ""
+   
+    max_time : datetime | None = record[0] if record else None
+    print(max_time)
+    max_time_str : str = max_time.strftime("%Y-%m-%d") if max_time else ""
 
     price_files = []
     for root, _, files in os.walk(args.price_folder):
         for file in files:
             if file.endswith("-prices.csv"):
-                if file.split("-prices.csv")[0] > max_time:
+                if file.split("-prices.csv")[0] >= max_time_str:
                     price_files.append(os.path.join(root, file))
 
+    price_files = sorted(price_files)
     if len(price_files) == 0:
         print(f"0 files found in {args.price_folder}")       
     else:
-        transactional_workload(sorted(price_files), args.speed)
+        transactional_workload(price_files, args.speed,max_time)
     
 main()

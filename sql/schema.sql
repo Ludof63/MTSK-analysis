@@ -37,11 +37,5 @@ create table stations_times (
     close_time time not null
 );
 
-create table stations_clusters (
-    stations_id uuid not null,    
-    cluster text not null,       
-    primary key(stations_id,cluster)               
-);
-
 
 

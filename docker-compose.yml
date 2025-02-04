@@ -2,7 +2,6 @@ services:
   cedar:
     container_name: cedar
     image: cedardb
-    restart: always
     env_file:
       - .env 
     ports:
@@ -13,7 +12,6 @@ services:
   grafana:
     container_name: grafana
     image: grafana/grafana:latest
-    restart: unless-stopped
     environment:
       - GF_DASHBOARDS_MIN_REFRESH_INTERVAL=100ms
     ports:

@@ -1,0 +1,97 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 3,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": {
+        "h": 17,
+        "w": 14,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "libraryPanel": {
+        "name": "Map of Prices",
+        "uid": "eebxxfc84d24gd"
+      },
+      "title": "$fuel prices now"
+    }
+  ],
+  "preload": false,
+  "schemaVersion": 40,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "2024-01-31 23:59:21",
+          "value": "2024-01-31 23:59:21"
+        },
+        "definition": "select format(max(time), 'YYYY-MM-DD HH:mm:ss') from prices;",
+        "label": "Replay Time",
+        "name": "replay_time",
+        "options": [],
+        "query": "select format(max(time), 'YYYY-MM-DD HH:mm:ss') from prices;",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "diesel",
+          "value": "diesel"
+        },
+        "label": "Fuel",
+        "name": "fuel",
+        "options": [
+          {
+            "selected": true,
+            "text": "diesel",
+            "value": "diesel"
+          },
+          {
+            "selected": false,
+            "text": "e5",
+            "value": "e5"
+          },
+          {
+            "selected": false,
+            "text": "e10",
+            "value": "e10"
+          }
+        ],
+        "query": "diesel, e5, e10",
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Map of Prices",
+  "uid": "aebxxi62vt728d",
+  "version": 4,
+  "weekStart": ""
+}
