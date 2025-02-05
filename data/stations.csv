@@ -17419,6 +17419,7 @@ e8f26844-d2ef-4dd4-8ddf-ce7b9ebcbf2a,Selbsttanken G.Overhoff GmbH,G.Overhoff Gmb
 db88ccfd-1214-43b7-a1bd-0294bcc34318,Bauer Oelzapf Mineralölvertrieb GmbH,Bauer Oelzapf Mineralölvertrieb Gmbh,Bahnhofstraße,138,74405,Gaildorf,49.0034,9.755,2025-01-31 00:22:30+01,True
 9f685a13-5672-4866-a730-605caad3c46e,Hochscheid,Tankpool24,Am dicken Stein 2,,54472,Hochscheid,49.7413412,7.253399534157161,2014-03-18 16:45:31+01,True
 f34f9241-6f55-48c6-aa4c-ee19f7272a22,BFT Tankstelle Schmidt e.K.,,Fürst-Dominik-Str.,2,55758,Sien,49.69425610761436,7.504314948509052,2014-03-18 16:45:31+01,True
+00061525-0001-4444-8888-acdc00000001,Eurotank,Eurotank,Talstraße 26,,58332,Schwelm,51.292509949999996,7.283308017943936,2014-08-22 00:00:01+02,True
 460e7b9d-3482-4191-933e-5682a7e5755f,Raiffeisen Hohe Mark Hamaland eG,,Südring 20 ,26,46342,Velen,51.766711900000004,6.843698546519092,2017-10-17 19:01:15+02,True
 dac5e971-9926-4464-acd9-a10294d448ec,ZIEGLMEIER GmbH & Co.KG,,Friedrichshofener Str.,86,85049,Ingolstadt,48.77814114714448,11.37947174549784,2018-06-04 23:30:07+02,True
 e70fb59b-3e7d-4ece-9e98-256206f0aec3,Tankst.Tauberbischofsheim,Herm,Wertheimer Str.,50,97941,Tauberbischofsheim,49.62494687609292,9.667247745794615,2018-12-04 23:30:06+01,True
@@ -17437,7 +17438,7 @@ deb35a65-4eed-4212-b6b7-0f23bc05e8ac,Aral Tankstelle,Aral Tankstelle,Athener Str
 4b41ea57-e036-4b1d-ae00-ef0938c1b205,Aral Tankstelle,Aral Tankstelle,Dekkers Waide ,2,46419,Isselburg,51.81644238391923,6.444304169598861,2024-03-01 23:38:05+01,True
 21ae6a4f-b239-4d6f-b8a4-12d7b9188fdf,Aral Tankstelle,Aral Tankstelle,Heinrich Ernemann Straße ,4,37308,Heilbad Heiligenstadt,51.3922481559024,10.127444650484156,2024-03-15 23:45:32+01,True
 26442cf8-fec4-47a8-b478-26964bb0ec22,Aral Tankstelle,Aral Tankstelle,Norsinger Straße ,2,79189,Bad Krozingen,47.92329596090024,7.704937789079455,2024-03-15 23:45:32+01,True
-8f52cd44-83e3-4be2-9ee9-82e6aaa8c2a9,Aral Tankstelle,Aral Tankstelle,Oldendorfer Str. ,37-39,49324,Melle,52.208714719795026,8.339572423248343,2024-03-15 23:45:32+01,True
+8f52cd44-83e3-4be2-9ee9-82e6aaa8c2a9,Aral Tankstelle,Aral Tankstelle,Oldendorfer Str. ,37-39,49324,Melle,52.21349272846239,8.319408984913663,2024-03-15 23:45:32+01,True
 1e3c5fc0-732f-4fe9-8ac0-06071610a299,Aral Tankstelle,Aral Tankstelle,Kupferdreher Str. ,50,45257,Essen,51.38671158784842,7.085117284821898,2024-03-15 23:45:32+01,True
 bf7a94a4-67ab-4a93-bb84-a73763945d5e,Aral Tankstelle,Aral Tankstelle,Hans-Fleißner-Str./K ,618,63329,Egelsbach,49.964314731271344,8.633558641750053,2024-03-15 23:45:32+01,True
 125fc04b-a413-43bf-b947-973e3fb1ec3d,Aral Tankstelle,Aral Tankstelle,Max-Planck-Str.,16,34253,Lohfelden,51.28200960478387,9.525541368378594,2024-03-15 23:45:32+01,True
@@ -17447,7 +17448,7 @@ bf7a94a4-67ab-4a93-bb84-a73763945d5e,Aral Tankstelle,Aral Tankstelle,Hans-Fleiß
 452a58be-be31-463b-ab33-0fcaab308df9,Bft Station,,Edertalstr.,21,57319,Bad Berleburg,51.015800228492296,8.48030160021143,2024-12-09 22:47:03+01,False
 45e46fbc-ef3e-44d7-b86c-59a554d0a514,bft,,Gewerbegebiet Morgensonne,2,07580,Braunichswalde,50.84382185,12.204275263011954,2024-12-09 22:47:03+01,True
 a6f1419d-786a-4aad-8d60-0cc2b2244de0,BFT Tankstelle Schmidt e.K.,,Fürst-Dominik-Str.,2,55758,Sien,49.69425610761436,7.504314948509052,2025-01-06 22:52:02+01,True
-014b3030-2c5d-4339-aa8d-69f29c0f8573,BfT Tankstelle,,Horchheimer Strasse,125,67547,Worms,49.614554105226716,8.335363899068762,2025-01-08 22:52:24+01,False
+014b3030-2c5d-4339-aa8d-69f29c0f8573,BfT Tankstelle,,Horchheimer Strasse,125,67547,Worms,49.61865422131186,8.349351842496537,2025-01-08 22:52:24+01,False
 e9fe68d3-ed46-428f-9e1c-5d4c6dd25fd2,AGRAVIS Ost GmbH & Co. KG,Raiffeisen,Bahnhofstr.,40,06905,Bad Schmiedeberg,51.7167,12.8027,2014-03-18 16:45:31+01,True
 82259e74-6f30-4d3f-a474-ab6143670187,Kirchheim Ost,Aral,"BAB A7, Motelstraße",5,36275,Kirchheim,50.83062,9.576259,2014-03-18 16:45:31+01,True
 6207dfe2-9b33-483b-a647-cfa3ffc5f170,Globus BM-TS Wittlich,Globus Baumarkt,Roemerstrasse ,53,54516,Wittlich,49.97737,6.8912,2014-03-18 16:45:31+01,True

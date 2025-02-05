@@ -127,13 +127,16 @@ def query_for_coordinates(post_code : str, street : str) -> tuple[float, float] 
 
 def add_stations_time(st_time, stations_id):
     def to_time(time_str : str) -> time:
-        return datetime.strptime(time_str, "%H:%M").time()
+        try:
+            return datetime.strptime(time_str, "%H:%M:%S").time()
+        except ValueError:
+            return datetime.strptime(time_str, "%H:%M").time()
     
     intervals : list[tuple[int,time,time]] = []
     for t in st_time['openingTimes']:
         assert(len(t['periods']) == 1)
         if t['periods'][0]['endp'] in ['00:00','24:00']:
-            t['periods'][0]['endp'] = '23:59'
+            t['periods'][0]['endp'] = '23:59:59'
         intervals.append((int(t['applicable_days']),to_time(t['periods'][0]['startp']) , to_time(t['periods'][0]['endp'])))
 
     intervals.sort(key= lambda x: x[0], reverse=True)
