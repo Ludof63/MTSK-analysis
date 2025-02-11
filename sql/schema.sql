@@ -1,7 +1,6 @@
 drop table if exists stations;
-drop table if exists stations_times;
 drop table if exists prices;
-drop table if exists stations_clusters;
+drop table if exists stations_times;
 
 create table stations (
     id uuid primary key,
