@@ -1,13 +1,13 @@
 # An Analysis of Germany's Fuel Prices
 
-A data analysis of the historical fuel prices in Germany with [CedarDB](https://cedardb.com).
+The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) (MTS-K) collects the fuel prices for gas station all over Germany. A history of all price changes is available [here](https://dev.azure.com/tankerkoenig/tankerkoenig-data). This project contains:
 
-The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) (MTS-K) collects the fuel prices for gas station all over Germany. A history of all price changes is available [here](https://dev.azure.com/tankerkoenig/tankerkoenig-data). 
+- scripts to download/prepare/ingest the dataset into a relational database
 
-This repository contains:
+- an analysis of the historical fuel prices in Germany using SQL (+ Python and Grafana for plotting)
+- a client that replicates the workload of prices changes and real-time dashboards in Grafana
 
-- A collection of analysis on the fuel prices in Germany
-- Scripts to download/prepare/ingest the dataset
+We use [CedarDB](https://cedardb.com), an HTAP relational database that allows us to execute at the same time OLAP (analytical queries) and OLTP (transactions).
 
 You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-analysis/analysis/).** Or you can run some queries on the dataset yourself, following the next steps.
 
