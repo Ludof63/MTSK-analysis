@@ -16,17 +16,10 @@ QUERY_COMPLETE="../sql/clustering/ClusterStations.sql"
 TABLE="stations_clusters"
 
 LIST_CLUSTERS ="""
-    SELECT cluster, COUNT(id) as n_stations, ARRAY_AGG(latitude) AS lats, ARRAY_AGG(longitude) AS lons,
+    SELECT cluster_name, COUNT(*) as n_stations, ARRAY_AGG(latitude) AS lats, ARRAY_AGG(longitude) AS lons,
     FROM {table}, stations WHERE station_id = id
-    GROUP BY cluster ORDER BY n_stations DESC;
+    GROUP BY cluster_name ORDER BY n_stations DESC;
     """
-
-
-def insert_create_table(q : str) -> str:
-    return f"CREATE TABLE {TABLE} AS " + q
-
-def insert_list_cluster(q : str) -> str:
-    return q.replace("select * from clusters", LIST_CLUSTERS.format(table="clusters"))
 
 
 def plot_clusters(output_file : str):
@@ -50,7 +43,7 @@ def plot_clusters(output_file : str):
             for i in range(row['n_stations']):
                 marker = folium.CircleMarker(
                     location=[row['lats'][i], row['lons'][i]],
-                    tooltip=row['cluster'],
+                    tooltip=row['cluster_name'],
                     fill=True,
                     fill_opacity=1,
                     opacity=1,
@@ -75,9 +68,8 @@ def main():
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-    execute_statement(f"DROP TABLE IF EXISTS {TABLE};")
     query_file = QUERY_PARTIAL if DO_PARTIAL else QUERY_COMPLETE
-    execute_statement(read_query(query_file,[insert_create_table]))
+    execute_statement(read_query(query_file))
 
     if DO_PLOT:
         plot_file = OUTPUT_PARTIAL if DO_PARTIAL else OUTPUT_COMPLETE
