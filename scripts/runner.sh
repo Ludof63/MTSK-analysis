@@ -25,7 +25,7 @@ up() {
     $DOCKER run --rm -d --name cedar   --network net_db -p 5432:5432 --env-file .env -v ./data:/data -v cedardb_data:/var/lib/cedardb/data cedardb
     $DOCKER run --rm -d --name grafana --network net_db -p 3000:3000 -e GF_DASHBOARDS_MIN_REFRESH_INTERVAL=100ms -v grafana_data:/var/lib/grafana grafana/grafana:latest
 
-    #$DOCKER run -d --rm --name postgres -p 54321:5432 -e POSTGRES_USER=client -e POSTGRES_PASSWORD=client -e POSTGRES_DB=client postgres:latest
+    #docker run -d --rm --name postgres -p 54321:5432 -e POSTGRES_USER=client -e POSTGRES_PASSWORD=client -e POSTGRES_DB=client postgres:latest
 }
 
 if [ "$1" == "up" ]; then

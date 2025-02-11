@@ -100,9 +100,8 @@ def main():
             record = cur.execute("select max(time) from prices;").fetchone()
 
    
-    max_time : datetime | None = record[0] if record else None
-    print(max_time)
-    max_time_str : str = max_time.strftime("%Y-%m-%d") if max_time else ""
+    print(f"Max time: {record[0] if record else "None"}")
+    max_time_str : str = record[0].strftime("%Y-%m-%d") if record else ""
 
     price_files = []
     for root, _, files in os.walk(args.price_folder):
@@ -112,9 +111,11 @@ def main():
                     price_files.append(os.path.join(root, file))
 
     price_files = sorted(price_files)
+    
     if len(price_files) == 0:
         print(f"0 files found in {args.price_folder}")       
     else:
+        max_time : datetime = record[0] if record else  datetime.strptime(files[0].split("-prices.csv")[0], "%Y-%m-%d") 
         transactional_workload(price_files, args.speed,max_time)
     
 main()
