@@ -1,3 +1,6 @@
+DROP TABLE IF EXISTS stations_clusters;
+
+CREATE TABLE stations_clusters AS
 WITH RECURSIVE param AS (
     SELECT 30 AS dst_threshold
 ),
@@ -28,4 +31,4 @@ clusters AS ( --assign a station to the closest top_city
     )
     WHERE rn == 1
 )
-select * from clusters;
+select station_id, cluster as cluster_name from clusters;

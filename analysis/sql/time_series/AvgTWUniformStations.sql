@@ -1,10 +1,8 @@
 --same as AvgTimeWeighted.sql but do not make difference between stations
-
-EXPLAIN
 WITH param AS (
     SELECT
-    '2023-01-20T23:00:00Z'::TIMESTAMP AS start_t,
-    '2024-01-31T22:59:59Z'::TIMESTAMP AS end_t,
+    '2024-01-08T00:00:00Z'::TIMESTAMP AS start_t,
+    '2024-01-21T23:59:59Z'::TIMESTAMP AS end_t,
     '1 hour'::INTERVAL AS time_granularity,
     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
     EXTRACT(EPOCH FROM (end_t - start_t)) AS number_seconds
@@ -17,21 +15,20 @@ time_series AS (
         (CASE WHEN day_of_week = 0 THEN 6 ELSE day_of_week -1 END ) as day_bit --for flextime stations
     FROM param, generate_series(0, (param.number_seconds / param.interval_seconds)) AS i
 ),
-stations_info AS(
-    SELECT s.id as station_id, city, brand, always_open FROM stations s, param
-    WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN param.start_t AND param.end_t)-- avoid inactive stations
-    --and always_open -- and city = 'Berlin'
+active_stations AS(
+    SELECT s.id as station_id, city, brand, always_open, first_active FROM stations s, param
+    WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN end_t - INTERVAL '3 day' AND end_t)-- avoid inactive stations
 ),
 stations_prices AS (
    SELECT time as valid_from, diesel as price, s.*
-    FROM param, prices p, stations_info s
+    FROM param, prices p, active_stations s
     WHERE s.station_id = p.station_uuid
     AND diesel_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t
 
     UNION ALL
 
     SELECT  param.start_t AS valid_from, price, s.*     --add last event before start
-    FROM param, stations_info s, (
+    FROM param, active_stations s, (
         SELECT time as valid_from, diesel as price
         FROM prices pp, param
         WHERE s.station_id = pp.station_uuid AND diesel_change IN (1,3)

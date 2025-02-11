@@ -1,18 +1,41 @@
 WITH param AS (
-    SELECT
-    '2024-01-08T00:00:00Z'::TIMESTAMP AS start_t,
-    '2024-01-21T23:59:59Z'::TIMESTAMP AS end_t,
-    '1 hour'::INTERVAL AS time_granularity,
-     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
+    SELECT 
+    '2024-01-31 23:59:21'::TIMESTAMP as end_t,
+    '10 minutes'::INTERVAL AS time_granularity,
+    '10 hours'::INTERVAL AS range_t,
+    end_t - range_t as start_t,
+    EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
+    52.50383 as lat, 13.3936 as lon, 30 AS dst_threshold
 ),
 time_series AS (
     SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, 
             bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,
-            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,
+            EXTRACT(dow FROM bucket_start) AS day_of_week, -- needed only for day_bit
+            (CASE WHEN day_of_week = 0 THEN 6 ELSE day_of_week -1 END ) as day_bit --needed for flextime stations
     FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i
 ),
+close_enough_stations AS (
+    SELECT s.*
+    FROM param, ( 
+        SELECT s.*, 2 * 6371 * ATAN2(
+                SQRT(
+                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
+                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
+                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
+                ),
+                SQRT(1 - (
+                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
+                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
+                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
+                ))
+            ) AS dst_km
+        FROM stations s
+    ) as s
+    WHERE dst_km <= dst_threshold
+),
 active_stations AS(
-    SELECT s.id as station_id, city, brand, always_open, first_active FROM stations s, param
+    SELECT s.id as station_id, s.*
+    FROM close_enough_stations s, param
     WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN end_t - INTERVAL '3 day' AND end_t)-- avoid inactive stations
 ),
 flextime_buckets AS(
@@ -59,3 +82,16 @@ select bucket_start as datetime, SUM(price * duration_seconds) / SUM(duration_se
 from prices_time_series
 group by datetime
 order by datetime;
+
+
+
+
+-- WITH param AS (
+--     SELECT 
+--     '$now_t'::TIMESTAMP as end_t,
+--     '${time_granularity}'::INTERVAL AS time_granularity,
+--     ( $__timeTo()::TIMESTAMP - $__timeFrom()::TIMESTAMP) as range_t,
+--     end_t - range_t as start_t,
+--     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
+--     $latitude as lat, $longitude as lon, $dst_threshold AS dst_threshold,
+-- )

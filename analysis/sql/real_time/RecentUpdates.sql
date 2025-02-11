@@ -1,8 +1,9 @@
 WITH param AS (
-    SELECT
-    '2024-01-01T00:00:00Z'::TIMESTAMP AS start_t,
-    '2024-01-31T23:59:59Z'::TIMESTAMP AS end_t,
-    '1 hour'::INTERVAL AS time_granularity,
+    SELECT 
+    (select max(time) from prices) as end_t,
+    '10 seconds'::INTERVAL AS time_granularity,
+    '10 hours'::INTERVAL AS range_t,
+    end_t - range_t as start_t,
     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
 ),
 time_series AS (
