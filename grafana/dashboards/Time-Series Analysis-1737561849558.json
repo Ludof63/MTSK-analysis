@@ -83,7 +83,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 12,
         "x": 0,
         "y": 0
@@ -150,7 +150,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "barWidthFactor": 0.6,
-            "drawStyle": "line",
+            "drawStyle": "bars",
             "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": {
@@ -206,7 +206,7 @@
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 12,
         "x": 12,
         "y": 0
@@ -230,7 +230,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH param AS (\n    SELECT '$time_granularity' AS time_granularity,\n    $__timeFrom()::TIMESTAMP AS start,\n    $__timeTo()::TIMESTAMP AS end,\n)\nSELECT \n    date_trunc(time_granularity, time) AS datetime,\n    COUNT(*) as n_updates\nFROM param,prices\nWHERE (diesel_change IN (1,3) OR e5_change IN (1,3) OR e10_change IN (1,3))\n \tAND time >= param.start AND time <= param.end\nGROUP BY datetime\nORDER BY datetime;",
+          "rawSql": "WITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nupdates AS (\n    SELECT bucket_start, station_uuid\n    FROM prices, time_series\n    WHERE \n        (diesel_change IN (1,3) OR e5_change IN (1,3) OR e10_change IN (1,3))\n        AND time BETWEEN bucket_start AND bucket_end\n)\nselect bucket_start as datetime, count(*)\nfrom updates\ngroup by datetime\norder by datetime;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -260,7 +260,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 6
       },
       "id": 4,
       "panels": [],
@@ -328,10 +328,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 6,
         "w": 10,
         "x": 0,
-        "y": 9
+        "y": 7
       },
       "id": 1,
       "options": {
@@ -442,10 +442,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 6,
         "w": 14,
         "x": 10,
-        "y": 9
+        "y": 7
       },
       "id": 6,
       "options": {
@@ -487,7 +487,7 @@
           }
         }
       ],
-      "title": "Time-Weighted Price Average Over Time with Uniform Stations",
+      "title": "Time-Weighted Price Average Over Time with Uniform Stations (wrong?)",
       "type": "timeseries"
     },
     {
@@ -552,10 +552,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
-        "w": 18,
+        "h": 8,
+        "w": 17,
         "x": 0,
-        "y": 16
+        "y": 13
       },
       "id": 5,
       "options": {
@@ -599,6 +599,287 @@
       ],
       "title": "Time-Weighted Price Average Over Time",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 7,
+      "panels": [],
+      "title": "Cities Comparison Over Time",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "description": "${cities}",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic",
+            "seriesBy": "min"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 15,
+        "x": 0,
+        "y": 22
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "none",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nactive_stations AS(\n    SELECT s.id as station_id, s.*, sc.cluster_id\n    FROM stations s, param, stations_clusters sc\n    WHERE station_id = id\n    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN end_t - INTERVAL '3 day' AND end_t)-- avoid inactive stations\n    AND city IN (${cities:singlequote})\n),\nflextime_buckets AS(\n    SELECT bucket_start, s.station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM time_series, stations_times st, active_stations s\n    WHERE st.station_id = s.station_id  AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, station_id, bucket_start as from_t , bucket_end as to_t\n    FROM time_series, active_stations WHERE always_open AND first_active <= bucket_start\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_prices AS (\n   SELECT time as valid_from, ${fuel:raw} as price, s.*\n    FROM param, prices p, active_stations s\n    WHERE s.station_id = p.station_uuid\n    AND ${fuel:raw}_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.* --add last event before start\n    FROM param, active_stations s, (\n        SELECT time as valid_from, ${fuel:raw} as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND ${fuel:raw}_change IN (1,3)\n        AND time <= start_t AND time >= start_t - '2 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t)\n)\nselect bucket_start as datetime, city , SUM(price * duration_seconds) / SUM(duration_seconds) as avg_${fuel:raw}_price, -- max(price) as max_price, min(price) as min_price,\nfrom prices_time_series\nwhere '$mode' = 'city_centers'\ngroup by datetime, city\norder by datetime, city;\n\n\n\n\nWITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nactive_stations AS(\n    SELECT s.id as station_id, city, brand, always_open, first_active, latitude, longitude, sc.short_cluster_name as group_id\n    FROM stations_clusters sc, stations s, param\n    WHERE station_id = id\n    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN end_t - INTERVAL '3 day' AND end_t) -- avoid inactive stations\n    AND cluster_name SIMILAR TO (SELECT string_agg('%' || w || '%', '|') FROM unnest(ARRAY[${cities:singlequote}]) AS w)\n),\nflextime_buckets AS(\n    SELECT bucket_start, s.station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM time_series, stations_times st, active_stations s\n    WHERE st.station_id = s.station_id  AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, station_id, bucket_start as from_t , bucket_end as to_t\n    FROM time_series, active_stations WHERE always_open AND first_active <= bucket_start\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_prices AS (\n   SELECT time as valid_from, ${fuel:raw} as price, s.*\n    FROM param, prices p, active_stations s\n    WHERE s.station_id = p.station_uuid\n    AND ${fuel:raw}_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.* --add last event before start\n    FROM param, active_stations s, (\n        SELECT time as valid_from, ${fuel:raw} as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND ${fuel:raw}_change IN (1,3)\n        AND time <= start_t AND time >= start_t - '2 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t)\n)\nselect bucket_start as datetime, group_id , SUM(price * duration_seconds) / SUM(duration_seconds) as avg_${fuel:raw}_price, -- max(price) as max_price, min(price) as min_price,\nfrom prices_time_series\nwhere '$mode' = 'city_areas'\ngroup by datetime, group_id\norder by datetime, group_id;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Average City Centers Prices over Time",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "multi"
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "description": "(colors do not match)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-BlYlRd"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 9,
+        "x": 15,
+        "y": 22
+      },
+      "id": 10,
+      "options": {
+        "basemap": {
+          "config": {
+            "showLabels": true,
+            "theme": "light"
+          },
+          "name": "Layer 0",
+          "opacity": 1,
+          "tooltip": true,
+          "type": "carto"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": false,
+              "style": {
+                "color": {
+                  "field": "cluster_id",
+                  "fixed": "dark-green"
+                },
+                "opacity": 1,
+                "rotation": {
+                  "fixed": 0,
+                  "max": 360,
+                  "min": -360,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 2,
+                  "max": 15,
+                  "min": 2
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/circle.svg",
+                  "mode": "fixed"
+                },
+                "symbolAlign": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "textConfig": {
+                  "fontSize": 12,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "city areas"
+            },
+            "location": {
+              "latitude": "latitude",
+              "longitude": "longitude",
+              "mode": "coords"
+            },
+            "name": "Cities",
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "fit",
+          "lat": 51.09994,
+          "lon": 9.868413,
+          "zoom": 15
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT $__timeTo()::TIMESTAMP AS end_t,\n),\nactive_stations AS(\n    SELECT s.id as station_id, city, brand,  latitude, longitude, cluster_id\n    FROM stations_clusters sc, stations s, param\n    WHERE station_id = id\n    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN end_t - INTERVAL '3 day' AND end_t) -- avoid inactive stations\n    AND cluster_name SIMILAR TO (SELECT string_agg('%' || w || '%', '|') FROM unnest(ARRAY[${cities:singlequote}]) AS w)\n)\nselect * from active_stations WHERE '$mode' = 'city_areas';\n\n\nWITH param AS (\n    SELECT $__timeTo()::TIMESTAMP AS end_t,\n),\nactive_stations AS(\n    SELECT s.id as station_id, city, brand, latitude, longitude, cluster_id\n    FROM stations s, param, stations_clusters\n    WHERE station_id = id\n    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN end_t - INTERVAL '3 day' AND end_t)-- avoid inactive stations\n    AND city IN (${cities:singlequote})\n)\nselect * from active_stations WHERE '$mode' = 'city_centers';\n",
+          "refId": "city areas",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Stations by Cities on Map ",
+      "type": "geomap"
     }
   ],
   "preload": false,
@@ -635,19 +916,19 @@
       },
       {
         "current": {
-          "text": "hour",
-          "value": "hour"
+          "text": "day",
+          "value": "day"
         },
         "label": "Time Granularity",
         "name": "time_granularity",
         "options": [
           {
-            "selected": true,
+            "selected": false,
             "text": "hour",
             "value": "hour"
           },
           {
-            "selected": false,
+            "selected": true,
             "text": "day",
             "value": "day"
           },
@@ -659,17 +940,110 @@
         ],
         "query": "hour, day, week",
         "type": "custom"
+      },
+      {
+        "allValue": "All",
+        "current": {
+          "text": [
+            "Berlin",
+            "Hamburg",
+            "München"
+          ],
+          "value": [
+            "Berlin",
+            "Hamburg",
+            "München"
+          ]
+        },
+        "definition": "WITH param AS (\n    SELECT max(time) as time_t from prices\n)\nSELECT city\nFROM stations, param\nWHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = id AND p.time BETWEEN (time_t - INTERVAL '2 day') AND time_t)\nGROUP BY city HAVING COUNT(*) > 40\nORDER BY COUNT(*)  DESC;",
+        "includeAll": false,
+        "label": "Cities",
+        "multi": true,
+        "name": "cities",
+        "options": [],
+        "query": "WITH param AS (\n    SELECT max(time) as time_t from prices\n)\nSELECT city\nFROM stations, param\nWHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = id AND p.time BETWEEN (time_t - INTERVAL '2 day') AND time_t)\nGROUP BY city HAVING COUNT(*) > 40\nORDER BY COUNT(*)  DESC;",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "19",
+          "value": "19"
+        },
+        "definition": "SELECT COUNT(DISTINCT cluster_id) from stations_clusters;\n",
+        "hide": 2,
+        "name": "n_cities",
+        "options": [],
+        "query": "SELECT COUNT(DISTINCT cluster_id) from stations_clusters;\n",
+        "refresh": 2,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "definition": "DROP TABLE IF EXISTS stations_clusters;\n\nCREATE TABLE stations_clusters AS\nWITH RECURSIVE param AS (\n    SELECT 30 AS dst_threshold\n),\ntop_cities AS ( --start from the top cities\n    SELECT city, AVG(latitude) AS lat, AVG(longitude) AS lon\n    FROM stations GROUP BY city HAVING COUNT(*) > 30\n),\nclusters AS ( --assign a station to the closest top_city \n    SELECT station_id, leader as cluster\n    FROM (\n        SELECT station_id, leader, ROW_NUMBER() OVER (PARTITION BY station_id ORDER BY distance_km ASC) AS rn\n        FROM param, (\n            SELECT s.id AS station_id, tc.city AS leader,\n            2 * 6371 * ATAN2(\n                SQRT(\n                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *\n                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)\n                ),\n                SQRT(1 - (\n                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *\n                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)\n                ))\n            ) AS distance_km\n            FROM stations s, param, top_cities tc)\n        WHERE distance_km <= dst_threshold\n    )\n    WHERE rn == 1\n),\nrec_clusters AS ( --merge close enough clusters togheter\n    SELECT station_id, cluster, 1 AS Level FROM clusters\n    UNION\n\n    SELECT station_id, CONCAT(LEAST(leader_a, leader_b), ', ', GREATEST(leader_a, leader_b)) AS cluster, level +1 as level \n    FROM param, rec_clusters rc, (\n        SELECT leader_a, leader_b, size_a, size_b\n        FROM (\n            SELECT leader_a, leader_b, size_a, size_b,\n                    2 * 6371 * ATAN2(\n                    SQRT(\n                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +\n                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *\n                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)\n                    ),\n                    SQRT(1 - (\n                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +\n                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *\n                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)\n                    ))\n                ) as distance_km\n            FROM (\n                SELECT cluster as leader_a, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_a\n                FROM rec_clusters, stations WHERE station_id = id\n                AND level = (select max(level) from rec_clusters r where r.station_id = id)\n                GROUP BY cluster ) AS tc1,\n                (\n                SELECT cluster as leader_b, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_b\n                FROM rec_clusters, stations WHERE station_id = id\n                AND level = (select max(level) from rec_clusters r where r.station_id = id)\n                GROUP BY cluster ) AS tc2)   \n        WHERE leader_a <> leader_b AND distance_km <= 2 * dst_threshold\n        ORDER BY distance_km ASC LIMIT 2\n    ) AS to_merge \n    WHERE rc.cluster = to_merge.leader_a\n),\nresult_clusters  AS (\n    SELECT station_id, cluster as cluster_name, DENSE_RANK() OVER (ORDER BY cluster) AS cluster_id, \n    FROM rec_clusters rc, \n    WHERE level = (select max(level) from rec_clusters h where h.station_id = rc.station_id)\n),\ncity_cluster AS (\n    SELECT city, cluster_id, (SELECT COUNT(*) FROM stations WHERE stations.city = cc.city) AS city_size\n    FROM (  SELECT unnest(string_to_array(cluster_name, ', ')) AS city, cluster_id\n            FROM result_clusters group by cluster_name,cluster_id) as cc\n),\nfinal_clusters AS (\n    SELECT station_id, old.cluster_id, new_name as cluster_name, \n        CASE WHEN LENGTH(cluster_name) > 20 THEN LEFT(cluster_name, 20) || '...' ELSE cluster_name END AS short_cluster_name\n    FROM result_clusters old, \n        ( SELECT cluster_id, array_to_string(array_agg(city ORDER BY city_size DESC), ', ') AS new_name\n        FROM city_cluster\n        GROUP BY cluster_id ) as new\n    WHERE old.cluster_id = new.cluster_id\n)\nselect * from final_clusters;\n\n",
+        "description": "Just Remove Wrong Updates",
+        "hide": 2,
+        "name": "create_clusters",
+        "options": [],
+        "query": "DROP TABLE IF EXISTS stations_clusters;\n\nCREATE TABLE stations_clusters AS\nWITH RECURSIVE param AS (\n    SELECT 30 AS dst_threshold\n),\ntop_cities AS ( --start from the top cities\n    SELECT city, AVG(latitude) AS lat, AVG(longitude) AS lon\n    FROM stations GROUP BY city HAVING COUNT(*) > 30\n),\nclusters AS ( --assign a station to the closest top_city \n    SELECT station_id, leader as cluster\n    FROM (\n        SELECT station_id, leader, ROW_NUMBER() OVER (PARTITION BY station_id ORDER BY distance_km ASC) AS rn\n        FROM param, (\n            SELECT s.id AS station_id, tc.city AS leader,\n            2 * 6371 * ATAN2(\n                SQRT(\n                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *\n                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)\n                ),\n                SQRT(1 - (\n                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *\n                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)\n                ))\n            ) AS distance_km\n            FROM stations s, param, top_cities tc)\n        WHERE distance_km <= dst_threshold\n    )\n    WHERE rn == 1\n),\nrec_clusters AS ( --merge close enough clusters togheter\n    SELECT station_id, cluster, 1 AS Level FROM clusters\n    UNION\n\n    SELECT station_id, CONCAT(LEAST(leader_a, leader_b), ', ', GREATEST(leader_a, leader_b)) AS cluster, level +1 as level \n    FROM param, rec_clusters rc, (\n        SELECT leader_a, leader_b, size_a, size_b\n        FROM (\n            SELECT leader_a, leader_b, size_a, size_b,\n                    2 * 6371 * ATAN2(\n                    SQRT(\n                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +\n                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *\n                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)\n                    ),\n                    SQRT(1 - (\n                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +\n                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *\n                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)\n                    ))\n                ) as distance_km\n            FROM (\n                SELECT cluster as leader_a, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_a\n                FROM rec_clusters, stations WHERE station_id = id\n                AND level = (select max(level) from rec_clusters r where r.station_id = id)\n                GROUP BY cluster ) AS tc1,\n                (\n                SELECT cluster as leader_b, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_b\n                FROM rec_clusters, stations WHERE station_id = id\n                AND level = (select max(level) from rec_clusters r where r.station_id = id)\n                GROUP BY cluster ) AS tc2)   \n        WHERE leader_a <> leader_b AND distance_km <= 2 * dst_threshold\n        ORDER BY distance_km ASC LIMIT 2\n    ) AS to_merge \n    WHERE rc.cluster = to_merge.leader_a\n),\nresult_clusters  AS (\n    SELECT station_id, cluster as cluster_name, DENSE_RANK() OVER (ORDER BY cluster) AS cluster_id, \n    FROM rec_clusters rc, \n    WHERE level = (select max(level) from rec_clusters h where h.station_id = rc.station_id)\n),\ncity_cluster AS (\n    SELECT city, cluster_id, (SELECT COUNT(*) FROM stations WHERE stations.city = cc.city) AS city_size\n    FROM (  SELECT unnest(string_to_array(cluster_name, ', ')) AS city, cluster_id\n            FROM result_clusters group by cluster_name,cluster_id) as cc\n),\nfinal_clusters AS (\n    SELECT station_id, old.cluster_id, new_name as cluster_name, \n        CASE WHEN LENGTH(cluster_name) > 20 THEN LEFT(cluster_name, 20) || '...' ELSE cluster_name END AS short_cluster_name\n    FROM result_clusters old, \n        ( SELECT cluster_id, array_to_string(array_agg(city ORDER BY city_size DESC), ', ') AS new_name\n        FROM city_cluster\n        GROUP BY cluster_id ) as new\n    WHERE old.cluster_id = new.cluster_id\n)\nselect * from final_clusters;\n\n",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "definition": "DELETE \nFROM prices \nWHERE (diesel_change in (1,3) and diesel < 0) OR (e5_change in (1,3) and e5 < 0) OR (e10_change in (1,3) and e10 < 0);",
+        "description": "Just Remove Wrong Updates",
+        "hide": 2,
+        "name": "cleaning",
+        "options": [],
+        "query": "DELETE \nFROM prices \nWHERE (diesel_change in (1,3) and diesel < 0) OR (e5_change in (1,3) and e5 < 0) OR (e10_change in (1,3) and e10 < 0);",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "city_centers",
+          "value": "city_centers"
+        },
+        "label": "Mode",
+        "name": "mode",
+        "options": [
+          {
+            "selected": true,
+            "text": "city_centers",
+            "value": "city_centers"
+          },
+          {
+            "selected": false,
+            "text": "city_areas",
+            "value": "city_areas"
+          }
+        ],
+        "query": "city_centers, city_areas",
+        "type": "custom"
       }
     ]
   },
   "time": {
     "from": "2024-01-08T00:00:00.000Z",
-    "to": "2024-01-14T23:59:59.000Z"
+    "to": "2024-01-21T23:59:59.000Z"
   },
-  "timepicker": {},
+  "timepicker": {
+    "refresh_intervals": []
+  },
   "timezone": "utc",
   "title": "Time-Series Analysis",
   "uid": "eearom40cn400d",
-  "version": 2,
+  "version": 36,
   "weekStart": "monday"
 }
