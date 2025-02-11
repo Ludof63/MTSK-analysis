@@ -1,8 +1,8 @@
 name: Weekly Prepare New Stations Dataset
 
 on:
-  schedule:
-    - cron: "0 0 * * 0" # Runs every Sunday at midnight (UTC)
+  # schedule:
+  #   - cron: "0 0 * * 0" # Runs every Sunday at midnight (UTC)
   workflow_dispatch: # You can manually trigger it as well
   
 permissions:
