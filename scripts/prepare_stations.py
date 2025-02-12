@@ -284,15 +284,17 @@ def main():
 
     stations_output_file = os.path.join(os.path.dirname(args.station_file),STATION_OUTPUT)
     prepare_stations(args.station_file,args.region_file, stations_output_file)
-    print(f'Stations dataset ready in {STATION_OUTPUT}')
+    print(f'Stations dataset ready in {stations_output_file}')
 
-    with open(os.path.join(os.path.dirname(args.station_file),TIMES_OUTPUT),'w+') as outfile:
+    times_output_file = os.path.join(os.path.dirname(args.station_file),TIMES_OUTPUT)
+    with open(times_output_file,'w+') as outfile:
         writer = csv.DictWriter(outfile, fieldnames=TIMES_HEADER) 
         writer.writeheader()
         
         for row in TIMES:
             writer.writerow(row)
-    print(f'Stations Times ready in {TIMES_OUTPUT}')
+
+    print(f'Stations Times ready in {times_output_file}')
 
     
 
