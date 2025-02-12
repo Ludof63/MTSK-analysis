@@ -31,7 +31,7 @@ services:
     network_mode: "host"
     env_file: .env
     volumes:
-      - ./data/prices:/data #prices folder mapped to /data
+      - ./data/prices:/prices
     pull_policy: build 
 
 volumes:

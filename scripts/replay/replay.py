@@ -35,7 +35,7 @@ def insert_row(row : dict[str,str]) -> str:
 
 
 def transactional_workload(files : list[str], speed_factor : int, start_time : datetime):
-    print(f"Similating Workload: from {files[0]} to {files[-1]}")   
+    print(f"Similating Workload: from {files[0]} to {files[-1]} , start_time : {start_time}")   
 
     start_time = start_time.replace(tzinfo=timezone.utc)
     found_start = False
@@ -99,23 +99,32 @@ def main():
         with conn.cursor() as cur:
             record = cur.execute("select max(time) from prices;").fetchone()
 
-   
-    print(f"Max time: {record[0] if record else "None"}")
-    max_time_str : str = record[0].strftime("%Y-%m-%d") if record else ""
+    max_time_str : str = ""
+    if (record is None or record[0] is None):
+        print("Result is empty")
+    else:
+        max_time_str = record[0].strftime("%Y-%m-%d")
+        print("Latest time:", record[0])
 
-    price_files = []
+    price_files : list[tuple[str,str]] = []
     for root, _, files in os.walk(args.price_folder):
         for file in files:
+            print(file)
             if file.endswith("-prices.csv"):
                 if file.split("-prices.csv")[0] >= max_time_str:
-                    price_files.append(os.path.join(root, file))
+                    price_files.append((file,os.path.join(root, file)))
 
-    price_files = sorted(price_files)
-    
-    if len(price_files) == 0:
+    price_files = sorted(price_files, key=lambda x: x[0])
+    file_list = [file for _, file in price_files]
+
+
+    if len(file_list) == 0:
         print(f"0 files found in {args.price_folder}")       
     else:
-        max_time : datetime = record[0] if record else  datetime.strptime(files[0].split("-prices.csv")[0], "%Y-%m-%d") 
-        transactional_workload(price_files, args.speed,max_time)
+        max_time : datetime = record[0]
+        if (record is None or record[0] is None):
+            max_time = datetime.strptime(price_files[0][0].split("-prices.csv")[0], "%Y-%m-%d") 
+
+        transactional_workload(file_list, args.speed,max_time)
     
 main()
