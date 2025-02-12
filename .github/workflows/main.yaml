@@ -2,7 +2,7 @@ name: Weekly Prepare New Stations Dataset
 
 on:
   schedule:
-    - cron: "15 * * * *"  
+    - cron: "0 14 * * 1"
   workflow_dispatch:
   
 permissions:
@@ -49,5 +49,5 @@ jobs:
           git config user.email "github-actions@github.com"
           git status
           git add data/stations.csv data/stations_times.csv
-          git commit -m "weekly update of stations dataset"
+          git commit -m "weekly update of stations dataset" || echo "No changes to commit"
           git push
