@@ -2,7 +2,7 @@ name: Weekly Prepare New Stations Dataset
 
 on:
   schedule:
-    - cron: "0 12 * * 3" 
+    - cron: "15 * * * *"  
   workflow_dispatch:
   
 permissions:
