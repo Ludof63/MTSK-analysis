@@ -1,8 +1,8 @@
 name: Weekly Prepare New Stations Dataset
 
 on:
-  # schedule:
-  #   - cron: "0 0 * * 0" # Runs every Sunday at midnight (UTC)
+  schedule:
+    - cron: "*/5 * * * *"
   workflow_dispatch: # You can manually trigger it as well
   
 permissions:
@@ -26,7 +26,19 @@ jobs:
           pip install requests
 
       - name: Download Newest Stations Dataset
-        run: bash ./scripts/download.sh -s
+        run: |
+          echo "Current date: $(date)"
+          echo "Yesterday's date: $(date --date="yesterday" "+%Y-%m-%d")"
+
+          bash ./scripts/download.sh -s
+
+          LINE_COUNT=$(wc -l < data/stations_original.csv)
+          echo "Number of lines in stations_original.csv: $LINE_COUNT"
+          
+          if [ "$LINE_COUNT" -lt 100 ]; then
+            echo "Error: stations_original.csv has fewer than 100 lines ($LINE_COUNT lines)"
+            exit 1
+          fi
       
       - name: Prepare Stations Dataset
         run: python scripts/prepare_stations.py data/stations_original.csv data/zuordnung_plz_ort.csv

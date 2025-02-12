@@ -10,9 +10,6 @@ date_station_file="$(date --date="yesterday" "+%Y-%m-%d")" #latest stations file
 station_file="${date_station_file}-stations.csv" 
 station_path="stations/$(date -d "$date_station_file" "+%Y/%m")/${station_file}"
 
-
-
-
 file_station_out="stations_original.csv"
 folder_prices_out="prices"
 
