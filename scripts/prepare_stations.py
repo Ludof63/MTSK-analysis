@@ -6,6 +6,7 @@ import requests
 import random
 import argparse
 import json
+import math
 
 
 RowType : TypeAlias =  dict[str | Any, str | Any]
@@ -40,8 +41,9 @@ def to_str_1(row : RowType) -> str:
     return s
 
 def to_str_2(row : RowType) -> str:
-    columns_to_print = columns_to_keep = ['post_code', 'city', 'street', 'house_number']
+    columns_to_print = columns_to_keep = ['uuid','post_code', 'city', 'street']
     s =", ".join([f"{key} : {row.get(key,'')}" for key in columns_to_print])
+    s += f", coords: ({row['latitude']},{row['longitude']})"
     return s
 
 def find_best_match(city : str, possible_cities : list[str]) -> str | None:
@@ -69,7 +71,7 @@ def query_osm(api_type : str, params : dict[str,Any]) -> Any | Exception:
     
     try:
         response = requests.get(url, params=params, headers={"User-Agent": user})
-        print(f"Sending: {response.url}")
+        print(f"\tSending: {response.url}")
         response.raise_for_status()
         data = response.json()
         return data
@@ -106,8 +108,8 @@ def query_for_postcode_city(lat: float, lon:float) -> tuple[str,str] | None:
     return None
 
 
-def query_for_coordinates(post_code : str, street : str) -> tuple[float, float] | None:
-    params = {'postalcode': post_code,'street': street,"country": "Germany","format": "json","addressdetails": 1}
+def query_for_coordinates(post_code : str  = "", city : str = "", street : str = "") -> tuple[float, float] | None:
+    params = {'postalcode': post_code, 'city': city, 'street': street,"country": "Germany","format": "json","addressdetails": 1}
 
     data = osm_search(params)
     if isinstance(data,Exception):
@@ -118,8 +120,8 @@ def query_for_coordinates(post_code : str, street : str) -> tuple[float, float] 
             lat, lon = float(el['lat']),float(el['lon'])
             return lat,lon
         
-    if street != '':
-        return query_for_coordinates(post_code,'') #street not found, just take coords of post_code
+    if post_code != "" and street != "":
+        return query_for_coordinates(post_code=post_code) #street not found, just take coords of post_code
     else:
         return None
     
@@ -164,24 +166,15 @@ def parse_row(row : RowType) -> RowType:
 
         return filter_row
 
+
+def are_coords_correct(row : RowType) -> bool:
+    if math.isclose(float(row['latitude']), 51.163375, rel_tol=0, abs_tol=0.001) and math.isclose(float(row['longitude']), 10.447683, rel_tol=0, abs_tol=0.001):
+        return False
+    
+    return is_point_in_germany(row)
+
 def prepare_stations(stations_dataset :str, plz_region_file : str,  output :str):
     tmp_out_file = 'data_temp.csv'
-
-    if JUST_TRIM:
-        with open(tmp_out_file,'w+') as outfile, open(stations_dataset, mode='r', newline='') as infile:
-            writer = csv.DictWriter(outfile, fieldnames=STATIONS_HEADER) 
-            reader = csv.DictReader(infile) 
-            writer.writeheader()
-        
-            for row in reader:
-                writer.writerow(parse_row(row))
-
-
-        os.replace(tmp_out_file,output)
-        return 
-
-
-    #official dataset of Germany's regions
     plz_to_cities : dict[str, list[str]] = {}
     with open(plz_region_file, 'r') as input_plz_to_city:
             reader_plz_city = csv.DictReader(input_plz_to_city)  
@@ -195,85 +188,122 @@ def prepare_stations(stations_dataset :str, plz_region_file : str,  output :str)
                     plz_to_cities[plz] = [city]
 
 
+
     
-    last_row = None
+    latest_active : str = ""
     with open(tmp_out_file,'w+') as outfile:
         writer = csv.DictWriter(outfile, fieldnames=STATIONS_HEADER)
         writer.writeheader()
 
-        invalid_plz_unknown_city : list[RowType] = [] 
+        invalid_plz : list[RowType] = [] 
         invalid_coord : list[RowType] = []
+        invalid_plz_coord : list[RowType] = []
 
         with open(stations_dataset, mode='r', newline='') as infile:
             reader = csv.DictReader(infile) 
-            for row in reader:
-                last_row = row
-                plz = row['post_code']
-                city = row['city']
+            for row in reader:                    
+                latest_active = row['first_active']
+                plz, city = row['post_code'], row['city']
 
                 if not plz.isdigit() or plz in ['12345', '00000']:
                     print(f"Skipping {to_str_1(row)}")
                     continue
-                    
+                                
                 if len(plz) < 5:
                     plz = "0"*(5-len(plz)) + plz
 
-                if plz in plz_to_cities: #valid post_code
-                    match = find_best_match(city,plz_to_cities[plz]) #find best candidate
-                    if match:
-                        row['city'] = match #otherwise keep old
-                
-                    if is_point_in_germany(row):
-                        writer.writerow(parse_row(row))
+                if are_coords_correct(row):
+                    if plz in plz_to_cities: #plz is correct
+                        match = find_best_match(city,plz_to_cities[plz]) #find best candidate
+                        row['city'] = match if match else row['city'] #otherwise keep old
+                        writer.writerow(parse_row(row)) #WRITE TO RESULT
                     else:
-                        invalid_coord.append(row)
-
-                else: #invalid post code
-                    if is_point_in_germany(row):
-                        invalid_plz_unknown_city.append(row)
+                        invalid_plz.append(row) #NEED TO CORRECT PLZ?
+                else:
+                    if plz in plz_to_cities: #plz is correct
+                        invalid_coord.append(row) #NEED TO CORRECT COORDS       
                     else:
-                        print(f"Skipping {to_str_1(row)} -> both post_code and coords wrong")
-    
+                        invalid_plz_coord.append(row) #NEED TO CORRECT
 
-        #fixing phase, using OSM ---------------------------------
-        still_problems : list[RowType] =[]
-
-        print(f"\n #station with invalid coords:  {len(invalid_coord)} ---------------")
-        for s in invalid_coord:
-            print(f"Trying to find coord for: {to_str_2(s)}")
-            match = query_for_coordinates(s['post_code'],s['street'])
-
-            if match:
-                print(f"\tFOUND coord: {match[0]}, {match[1]} for {s['post_code']}, {s['street']}")
-                s['latitude'], s['longitude'] = match
-                writer.writerow(parse_row(s))
-            else:
-                print(f"\tNOT FOUND coords: for {s['post_code']}, {s['street']}")
-                still_problems.append(s)
-
-        print(f"\n #station with invalid plz:  {len(invalid_plz_unknown_city)} --------------")
-        for s in invalid_plz_unknown_city:
-            print(f"Trying to find plz,city for: {to_str_1(s)}")
-            match = query_for_postcode_city(float(s['latitude']),float(s['longitude']))
-
-            if match:
-                print(f"\tFOUND: {match[0]}, {match[1]} for {s['post_code']}, {s['city']}")
-                s['post_code'], s['city'] = match
-                writer.writerow(parse_row(s))
-            else:
-                print(f"\tNOT FOUND: for {s['post_code']}, {s['city']}")
-                still_problems.append(s)
         
-        if len(still_problems) == 0:
-            print("OK")
-        else:
-            print(f"\nSTILL PROBLEMS: {len(still_problems)}")
-            for s in still_problems:
-                print(to_str_1(s)) 
+        #fixing phase, using OSM ---------------------------------
+        DO_FIX_COORDS, KEEP_INVALID_COORDS= True, False
+        DO_FIX_PLZ, KEEP_INVALID_PLZ= True, False
+        DO_FIX_PLZ_COORDS, KEEP_INVALID_PLZ_COORDS= True, False
+        
+        okay_fixes, not_okay_fixes = 0,0
 
+        print(f"\nINVALID COORDS: {len(invalid_coord)}")
+        for row in invalid_coord:
+            print(f"Invalid coords: {to_str_2(row)}")
+            if DO_FIX_COORDS:
+                match = query_for_coordinates(row['post_code'], row['city'], row['street'])
+
+                if match:
+                    print(f"\tFOUND coord: {match[0]}, {match[1]}")
+                    row['latitude'], row['longitude'] = match
+                    okay_fixes += 1
+                    
+                else:
+                    print(f"\tNOT FOUND coords!")
+                    not_okay_fixes += 1
+                
+                if match or KEEP_INVALID_COORDS:
+                    writer.writerow(parse_row(row)) #WRITE TO RESULT
+
+            elif KEEP_INVALID_COORDS:
+                    writer.writerow(parse_row(row)) #WRITE TO RESULT
+                 
+        
+        print(f"\nINVALID PLZ: {len(invalid_plz)}")
+        for row in invalid_plz:
+            print(f"Invalid plz: {to_str_2(row)}")
+            if DO_FIX_PLZ:
+                match = query_for_postcode_city(float(row['latitude']),float(row['longitude']))
+                            
+                if match:
+                    print(f"\tFOUND zip,city: {match[0]}, {match[1]}")
+                    row['post_code'], row['city'] = match
+                    okay_fixes += 1
+                else:
+                    print(f"\tNOT FOUND info!")
+                    not_okay_fixes += 1
+                
+                if match or KEEP_INVALID_PLZ:
+                    writer.writerow(parse_row(row)) #WRITE TO RESULT
+
+            elif KEEP_INVALID_PLZ:
+                    writer.writerow(parse_row(row)) #WRITE TO RESULT
+             
+
+        print(f"\nINVALID PLZ AND COORD: {len(invalid_plz_coord)}")
+        for row in invalid_plz_coord:
+            print(f"Invalid plz and coord: {to_str_2(row)}")
+            if DO_FIX_PLZ_COORDS:
+                match_coords = query_for_coordinates(city=row['city'], street=row['street'])
+                if match_coords:
+                    print(f"\tFOUND coords: {match_coords[0]}, {match_coords[1]}")
+                    row['latitude'], row['longitude'] = match_coords
+                    match_info = query_for_postcode_city(float(row['latitude']),float(row['longitude']))
+                    if match_info:
+                        print(f"\tFOUND zip,city: {match_info[0]}, {match_info[1]}")
+                        row['post_code'], row['city'] = match_info
+
+                    okay_fixes += 1
+                else:
+                    print(f"\tNOT FOUND coords!")
+                    not_okay_fixes += 1
+
+                if match_coords or KEEP_INVALID_PLZ_COORDS:
+                    writer.writerow(parse_row(row)) #WRITE TO RESULT
+
+            elif KEEP_INVALID_PLZ_COORDS:
+                    writer.writerow(parse_row(row)) #WRITE TO RESULT
+
+    print(f"Status of Fixed: OK: {okay_fixes} , NOT OKAY: {not_okay_fixes}")
+    print(f"Last station insert in dataset active from {latest_active}")
     os.replace(tmp_out_file,output)
-    if last_row:
-        print(f"Last station insert in dataset active from {last_row['first_active']}")
+        
 
 
 def main():
