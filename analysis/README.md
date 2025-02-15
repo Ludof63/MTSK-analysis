@@ -1,213 +1,253 @@
-# MTS-K dataset: analysis
+# Analysis of Fuel Prices in Germany
 
-MTS-K records the history of price changes for fuel stations in Germany. In this document we get started with a basic analysis, focusing on a point in time and extracting statistics on the datest. While the exploration of data over time continues [here](time_series.md), with a time-series analysis.
+Fuel prices impact all of us—whether we’re commuting to work, planning a road trip, or managing logistics for a business. But have you ever wondered how fuel prices fluctuate and what insights we can gain from this data?
 
-> The SQL code blocks are meant to be examples runnable with `psql`
+The [Markttransparenzstelle für Kraftstoffe (MTS-K)](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) collects and maintains fuel price data from gas stations all over Germany, making it possible to analyze price trends in detail. A historical record of all price changes is publicly available [here](https://dev.azure.com/tankerkoenig/tankerkoenig-data). In this post, we’ll break down key findings from an in-depth analysis of fuel prices across Germany.
 
-> When I refer to scripts they can be found in the folder `scripts/`, while SQL queries can be found in `sql/`
+**How We Approach the Analysis**
 
-## Starting Point
+We’ll use **SQL** for querying and **Python & Grafana** for visualizations. Most queries and visualizations can be explored in an **interactive Grafana dashboard**, where you can tweak parameters. Some interactive maps are plotted with Python.
 
-As we will use mainly SQL for this analysis I suggest to take a look at the [schema](../sql/MTS-K_schema.sql) that consists in 3 tables:
+Want to follow along? Check out the setup instructions [here](../README.md) to download and load the dataset. Then access Grafana at http://localhost:3000 (user: `admin`, password: `admin`), each section will link to the specific dashboard.
 
-- **prices**: each entry is a price change for a certain fuels for a certain station
-- **stations**: information about fuel stations
-- **stations_times**: opening hours for each station
+**Structure of the Analysis**
 
-Important notes:
+We’ll take a step-by-step approach to uncover insights from the data:
 
-- **A price `p` for a fuel `f` at a certain station `s` is valid until the next (in time) price event for `f` for `s`.**
-- For a fuel `f` I should only consider the price events with `f_change IN (1,3)`. From now on when I refer to a price event I consider it a valid one.
-- We can classify the stations in **Always-Open** stations and **Flex-Time** stations. The Flex-Time stations have entries in `station_times`
+1. **[Understanding the Dataset](#Introduction):** First, we introduce the schema and key properties of the dataset.
+2. **[Point-in-Time Analysis](#"Point-in-Time Analysis"):** We then examine fuel prices at specific moment to identify moments to identify trends and regional differences.
+3. **[Time-Series Analysis](##"Time-Series Analysis"):** Here, we will focus on how prices evolve over time, trying to spot patterns and fluctuations.
+4. **Real-Time Monitoring with Grafana:** Finally, we design a real-time analysis using Grafana, assuming continuous data ingestion into our database. This showcases the power of *Hybrid Transactional/Analytical Processing (HTAP) databases* for real-time insights.
 
+## Understanding the Dataset
 
+Our analysis is based on the schema defined in [sql/schema.sql](../sql/schema.sql), which consists of three main tables:
 
-## How many stations are open at a certain time?
+- **stations**: Contains information about each fuel station.
+- **stations_times**: Stores the opening hours for each station.
+- **prices**: Tracks price changes for different fuels at specific stations.
 
-Let's start by analyzing fuel prices at a point in time. We *set the parameter `time`* (psql variable),  we will use it for the following queries
+**Properties of the Dataset**
 
-```postgresql
-\set time '2024-11-01 12:00'
-```
+There are several important aspects to consider when working with this data:
 
-In this first example we count count the open stations. To achieve that correctly, we have to differentiate between Always-Open and Flex-Time stations. Additionally, the  stations dataset is incremental, so there may be inactive stations in it. To avoid counting inactive stations we **consider active only the stations with an event in the previous 48 hours** (see [updates frequency analysis](updates_frequencies.md)).
+- A price `p` for a fuel `f` for a certain station `s` is valid until the next update in time for `f` for `s`
+- For a fuel `fuel` I should only consider the price events with `fuel_change IN (1,3)`. 
+- There are 2 types of stations: **Always-Open** and  **Flex-Time** stations. Flex-Time stations have their opening hours recorded in `stations_times`.
+- Some stations in the dataset are inactive. We classify a station as inactive if it hasn’t updated its prices in the last three days (we will discuss how we arrived at this threshold [later]()).
 
-```postgresql
+The dataset covers three fuel types: diesel, e5, e10. In most cases, we’ll use diesel prices as examples, but the analysis applies to other fuels by adjusting the relevant attributes. Additionally, in the Time-Series analysis, we will examine whether fuel prices exhibit temporal correlations (spoiler: they do).
+
+# Point-in-Time Analysis 
+
+After introducing the basic properties of our dataset, in this section we start by considering one point in time and trying to answer some questions. Let’s assume it’s Wednesday, *January 31st, 2024, at 5:00 PM* (*+01*)—halfway through the workweek—when you step out of the office and realize your car’s out of gas.
+
+The first question one would like to give an answer to is, what is the current fuel price. Let's start by approximating it with **"what is the current average price over the entire country?"**. 
+
+> Grafana Dashboard: [Point-In-Time Analysis](http://localhost:3000/goto/6U6m6S5HR?orgId=1)
+
+### Current Average Price
+
+To answer this question we first have to understand "**how many stations are open now?**". To answer this we have to recall that not all stations are the same. We can start from the `active_stations` and then filter the the `flextime` stations, while keeping all the `alwaysopen` ones. We can express this in SQL with:
+
+```sql
 WITH param AS (
-    SELECT 
-    :'time'::TIMESTAMP AS time,
-    (CASE WHEN EXTRACT(dow FROM time) = 0 THEN 6 ELSE EXTRACT(dow FROM time) -1 END ) as day_bit,
-    '2 day'::INTERVAL as activity_interval
+    SELECT '2024-01-31 17:00'::TIMESTAMP AS time_t, 
+        (CASE WHEN EXTRACT(dow FROM time_t) = 0 THEN 6 ELSE EXTRACT(dow FROM time_t) -1 END ) as day_bit,
 ),
+active_stations AS(
+    SELECT s.id as station_id, s.*
+    FROM param, stations s 
+    WHERE first_active <= time_t AND
+    EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND time BETWEEN time_t - INTERVAL '3 day' AND time_t)-- avoid inactive stations
+), 
 alwaysopen AS(
-    SELECT s.id as station_id, s.always_open, city, brand, latitude, longitude
-    FROM stations s, param
-    WHERE s.always_open
-    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time <= param.time AND p.time >= param.time - param.activity_interval) -- avoid inactive stations
+    SELECT s.* FROM active_stations s WHERE s.always_open 
 ),
-flextime_open AS(
-    SELECT
-        station_id, false as always_open, city, brand, latitude, longitude
-    FROM stations_times st, stations s, param
-    WHERE st.station_id = s.id
-    AND (st.days & (1 << (param.day_bit))) > 0 -- open day?
-    AND time BETWEEN time::date + open_time AND time::date + close_time -- opening hours?
-    AND EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time <= param.time AND p.time >= param.time - param.activity_interval) -- avoid inactive stations
+flextime AS(
+    SELECT s.*
+    FROM param, stations_times st, active_stations s
+    WHERE st.station_id = s.station_id
+        AND (days & (1 << (day_bit))) > 0 -- open day?
+        AND time_t BETWEEN time_t::date + open_time AND time_t::date + close_time -- opening hours?
 ),
 open_stations AS (
-    SELECT * FROM alwaysopen
-    UNION ALL -- alwaysopen and flextime stations do not overlap
-    SELECT *  FROM flextime_open
+    SELECT * FROM alwaysopen UNION ALL SELECT * FROM flextime
 )
-select count(station_id) as cnt from open_stations;
+SELECT 
+    (select count(station_id) from flextime) as n_flextime,
+    (select count(station_id) from alwaysopen) as n_alwaysopen,
+    n_flextime + n_alwaysopen as n_open_stations;
 ```
 
-## What is the price at a certain time?
+```postgresql
+ n_flextime | n_alwaysopen | n_open_stations 
+------------+--------------+-----------------
+       8455 |         6191 |           14646
+(1 row)
+```
 
-To get the (diesel) prices at a certain point in time we can extend `OpenStationsAt` 
+Now we can extend the `open_stations`, getting the current price (in this case diesel price) for each station. The "current" price, `curr_price` , is the price set by the *latest update before the current time*:
 
 ```postgresql
-open_curr_price AS (
-    SELECT 
-       open_stations.*, p.price, p.time
-    FROM
-        open_stations, param, 
-        (
+curr_prices AS (
+    SELECT open_stations.*, p.price, p.time
+    FROM open_stations, param, (
             SELECT diesel as price ,time
             FROM prices
-            WHERE station_uuid = station_id AND time <= param.time 
-            AND time >= param.time - activity_interval --limit
+            WHERE station_uuid = station_id AND time <= time_t 
+            AND time >= time_t - INTERVAL '3 day'
             AND diesel_change IN (1, 3)
             ORDER BY time DESC
             LIMIT 1
         ) p
 )
-select avg(price) from open_curr_price;
+select avg(price) as average_price from curr_prices;
 ```
 
-In this example we are computing the average price over the whole country at `2024-11-01 12:00:00`
-
-### Prices distribution
-
-Now using the `diesel` prices at `2024-11-01 12:00:00`, let's plot using `prices_distribution.py` the distribution over the station over the prices.<img src="plots/prices_dist_diesel.png" style="zoom:72%;" />
-
-We notice that most of the prices are concentrated around the average (`1.54`), while there are few outliers and some of them registered crazy expensive prices. We can check the number of outliers using `z_score` (considering outliers those stations for which `abs(z_score) > 3`). 
-
 ```postgresql
+      average_price       
+--------------------------
+ 1.6882916609706083390293
+(1 row)
+```
+
+The average on its own doesn't give us too much insights, so let's use `curr_prices` to analyze the distribution of the prices.
+
+### Prices Distribution
+
+Let's plot the distribution of prices as an histogram in Grafana.
+
+![](./plots/prices_hist.png)
+
+We notice a normal distribution centered around the average price with **few but very expensive outliers**. We can investigate a bit further these outliers, extracting some statistics:
+
+```sql
 stats AS (
-    SELECT AVG(price) AS avg_price, STDDEV(price) AS std_dev_price FROM open_curr_price
+    SELECT AVG(price) AS avg_price, STDDEV(price) AS std_dev_price FROM curr_prices
 ),
-z_scores AS (
+prices_scores AS (
     SELECT p.*, (p.price - avg_price) / std_dev_price AS z_score
-    FROM open_curr_price p,stats
+    FROM curr_prices p,stats
 )
-SELECT 
-    COUNT(*) AS total_count,
-    SUM(CASE WHEN ABS(z_score) > 3 THEN 1 ELSE 0 END) AS outlier_count
-FROM z_scores;
+SELECT
+    (select count(*) from prices_scores) as n_open_stations,
+    (select count(*) from prices_scores where abs(z_score) > 3) as n_outliers,
+    (n_outliers::numeric / n_open_stations) * 100 as percentage_outliers;
 ```
 
 ```postgresql
- total_count | outlier_count 
--------------+---------------
-       15037 |           333
+ n_open_stations | n_outliers | percentage_outliers 
+-----------------+------------+---------------------
+           14630 |        324 |            2.214600
+(1 row)
 ```
 
-Around 2% of the stations report outlier prices. While if we do not consider this outliers the distribution would look like
-<img src="plots/prices_dist_diesel_no_outliers.png" style="zoom: 67%;" />
+We identify the outliers using the [standard score](https://en.wikipedia.org/wiki/Standard_score), as those stations with a prices more that 3 standard deviations distant from the mean. We can also plot the stations without outliers, to confirm the normal distribution.
 
-### Distribution of Prices on Germany Map
+![](./plots/prices_hist_nooutliers.png)
 
-Now it would be interesting to plot the prices at a current time on the map of Germany. The stations are plot with a color base on their deviation from the mean, the mean doesn't consider outliers that are reported as black points.
+We've noticed that a small percentage of gas stations stand out with significantly higher prices. Naturally, this raises questions—why are these stations so expensive? To dig deeper, let’s take a closer look by mapping them out and exploring any potential patterns. 
+
+### Fuel Prices on Germany Map
+
+We already have all the informations we need in the CTE `prices_scores` (station's informations, including coordinates, and score). We can use python with [folium](https://python-visualization.github.io/folium/latest/) to put the stations on Germany's map:
 
 <iframe src="plots/prices_on_map.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
-> The map `prices_on_map.html` was generated using `prices_map.py` for `diesel` and `e5` at `2024-11-01 12:00:00` (the rendering of the html requires around 10s).
->
+> Generated with the script `scripts/prices_on_map.py` (to run look here).
 
-From the map one can notice that:
+Each stations is colored:
 
-- **basically all the outliers are located on autobahn**
-- As we could expect, there seems to be a **correlation between fuel prices of stations in a local area**. 
-- As for the diesel, overall one can see that cities (and their surroundings) in the West of Germany are cheaper that those in the South/Nord - Est
+- *black* if it is an outlier
 
-### Compare Brands 
+- *based on its standard deviation*, otherwise
 
-We can also compare the top 10 brands (by number of stations), by extending `PriceAt` with
+  
 
-```sql
-select brand, COUNT(*) n_stations, AVG(price) avg_price
-from open_curr_price where brand <> ''
-group by brand order by n_stations DESC limit 10;
-```
+Zooming into the map reveals some interesting patterns:
 
-If we plot is with `prices_brands.py` we get
+- Almost all **outlier stations are located along the Autobahn**, confirming the common knowledge that highway fuel prices tend to be significantly higher.
+- As expected, there seems to be a **strong correlation between fuel prices in local areas**—stations close to each other tend to have similar prices. This pattern is especially clear in cities and their surrounding areas.
 
-<img src="plots/prices_brand_diesel.png" style="zoom:72%;" />
+Building on this intuition, let’s take our analysis a step further and compare fuel prices across Germany’s largest cities. Are some cities consistently more expensive than others? Let’s find out! 
 
-We notice that while there are differences, those are contained, probably also due to the average across the entire country.
+### Comparing Cities by Fuel Prices
 
-## Comparing Cities by Fuel Prices
-
-### Group Stations by City Name
-
-To compare fuel prices across cities we first have to solve the problem of **identifying the stations that belong to a city**. We can use the city attribute of stations as a starting point, after having prepared the dataset (more information in `/scripts/data_prep`).
-
-We can extend `PriceAt` with the following aggregation
+Among the stations information we have the `city` name, so as a starting point we could think to aggregate on this attribute as follow:
 
 ```sql
-top_cities AS(
-    SELECT city, COUNT(*) n_stations, AVG(price) avg_price
-    FROM open_curr_price
-    GROUP BY city ORDER BY n_stations DESC limit 10
-)
-select city, n_stations, avg_price::NUMERIC(10, 3) as avg_price
-from top_cities order by avg_price;
+SELECT city, count(*) as n_open_station, avg(price) as average_price
+FROM  curr_prices
+GROUP BY city HAVING count(*) > 40
+ORDER BY average_price;
 ```
 
 ```postgresql
-   city    | n_stations | avg_price 
------------+------------+-----------
- Bremen    |         75 |     1.499
- Köln      |        106 |     1.512
- Essen     |         67 |     1.516
- Berlin    |        274 |     1.517
- Dortmund  |         88 |     1.520
- Stuttgart |         70 |     1.528
- Hamburg   |        207 |     1.539
- München   |        129 |     1.549
- Nürnberg  |         74 |     1.563
- Hannover  |         71 |     1.580
+       city        | n_open_station |      average_price       
+-------------------+----------------+--------------------------
+ Mönchengladbach   |             41 | 1.6375365853658536585365
+ Mannheim          |             41 | 1.6509512195121951219512
+ Gelsenkirchen     |             42 | 1.6575476190476190476190
+ Bochum            |             55 | 1.6586363636363636363636
+ Essen             |             67 | 1.6588656716417910447761
+ Düsseldorf        |             59 | 1.6622203389830508474576
+ Dortmund          |             87 | 1.6653908045977011494252
+ Bielefeld         |             63 | 1.6662063492063492063492
+ Köln              |            108 | 1.6665370370370370370370
+ Stuttgart         |             70 | 1.6671428571428571428571
+ Wuppertal         |             46 | 1.6740000000000000000000
+ Nürnberg          |             75 | 1.6806000000000000000000
+ Frankfurt am Main |             62 | 1.6819838709677419354838
+ Bremen            |             75 | 1.6854000000000000000000
+ Dresden           |             54 | 1.6904444444444444444444
+ Duisburg          |             62 | 1.6930322580645161290322
+ Hannover          |             71 | 1.6933661971830985915492
+ Berlin            |            271 | 1.6945719557195571955719
+ Hamburg           |            205 | 1.7004634146341463414634
+ Augsburg          |             42 | 1.7037619047619047619047
+ München           |            127 | 1.7055905511811023622047
+ Leipzig           |             60 | 1.8041333333333333333333
 ```
 
-After obtaining this first comparison between cities, we should ask ourselves what are we considering as a "city". Let's start by plotting the stations of each city on a map:
+That we can visualize in Grafana:
+
+![](./plots/city_center_prices.png)
+
+At this point however we should ask ourselves, "*which area are we considering as a city?*". 
+
+Let's ignore momentarily the certain time, but let's just consider all the stations. We want to plot the stations of the biggest cities on a map (assigning a unique color to each city). We query them with
+
+```sql
+SELECT id as station_id, city, latitude, longitude
+FROM stations 
+WHERE city IN (select city from stations group by city having count(*) > 40)
+```
+
+and plot them with the python (`cities_map.py`):
 
 <iframe src="plots/cities_map.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
-The map is generated using `cities_map.py` with the following query:
+Looking at the map, we see that grouping stations by city often means focusing only on the city center. While this can be useful, a more insightful approach would be to compare cities along with their surrounding areas—since people don’t always refuel in the city center.
 
-```postgresql
-SELECT city, COUNT(*) as n_stations, AVG(latitude) AS lat, AVG(longitude) AS lon,
-FROM stations GROUP BY city HAVING COUNT(*) > 40
-```
+To achieve this, we need to **cluster stations by city area**.
 
-From the map we can notice that grouping by city we're in reality *just considering the stations in the city center*. While, one would like to group stations in the local area of a city (city center and surroundings). However, the MTS-K dataset doesn't help us in this case, so we have to compute ourselves some kind of **clustering of the stations by city area**.
+#### Clustering Stations by City Area
 
-### Clustering Stations by City Areas
+Before clustering stations by city area, we need to ask: **what exactly do we define as a city area?** To guide our custom clustering approach, I’ve set two key requirements:
 
-The most important question we have to ask ourselves is what is a "city area"?
+1. **Capture large city areas** – We should focus on stations around major cities while excluding those too far away.
+2. **Merge nearby cities** – If multiple cities are close to each other, they should be considered together in the same cluster.
 
-As the answer to this question depends on the city topology, I decided to simplify the city area  as the area of a circle of `dst_threshold` km with center the city center.
+Let's start with the first point, which we can easily express in SQL:
 
-The idea is to start from the biggest cities' centers. We consider each of this city as a "cluster leader". Each station is the assigned to the cluster of the closest big city (if it lies within `dst_threshold` from a big city):
-
-```postgresql
+```sql
 WITH RECURSIVE param AS (
     SELECT 30 AS dst_threshold
 ),
 top_cities AS ( --start from the top cities
     SELECT city, AVG(latitude) AS lat, AVG(longitude) AS lon,
-    FROM stations GROUP BY city HAVING COUNT(*) > 30
+    FROM stations GROUP BY city HAVING COUNT(*) > 40
 ),
 clusters AS ( --assign a station to the closest top_city 
     SELECT station_id, leader as cluster
@@ -232,15 +272,22 @@ clusters AS ( --assign a station to the closest top_city
     )
     WHERE rn == 1
 )
+select station_id, cluster as cluster_name from clusters;
 ```
 
-Now if we plot the clusters on a map get this:
+To define the center of a major city (`top_cities`), we take the average coordinates of stations in the city center—a simple yet effective approach for our needs.
+
+From there, we assign each station within `dst_threshold` km of a major city's center to its **closest big city**, which serves as the *cluster leader.*
+
+Now, let’s visualize these temporary clusters on the map using Python (`cluster_stations.py -p`):
 
 <iframe src="plots/stations_clusters_partial.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
-While for isolated cities like Berlin and Nuremberg this is enough, we notice that there are clusters close too each other that we would like to "merge". We can think of the merge phase as iterative process in which each iteration merges the close-enough clusters until there are not, close-enough clusters. 
+Our first step works well for isolated cities like Berlin, but for cities close together, we need to merge them. We do this iteratively, combining the two closest clusters at each step until no pair is within 2×`dst_threshold`.
 
-We can run the merge phase using recursive SQL:
+Using *recursive SQL*, we rely on the database to handle this efficiently (spoiler: Cedar runs it smoothly on my machine with 16GB RAM and 8 cores). We approximate each cluster’s position by averaging the coordinates of its stations at each step.
+
+Now, let’s extend our previous CTE `clusters`:
 
 ```sql
 rec_clusters AS ( --merge close enough clusters togheter
@@ -249,9 +296,9 @@ rec_clusters AS ( --merge close enough clusters togheter
 
     SELECT station_id, CONCAT(LEAST(leader_a, leader_b), ', ', GREATEST(leader_a, leader_b)) AS cluster, level +1 as level 
     FROM param, rec_clusters rc, (
-        SELECT leader_a,leader_b
+        SELECT leader_a, leader_b, size_a, size_b
         FROM (
-            SELECT leader_a, leader_b,
+            SELECT leader_a, leader_b, size_a, size_b,
                     2 * 6371 * ATAN2(
                     SQRT(
                         POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +
@@ -265,12 +312,12 @@ rec_clusters AS ( --merge close enough clusters togheter
                     ))
                 ) as distance_km
             FROM (
-                SELECT cluster as leader_a, AVG(latitude) AS lat, AVG(longitude) AS lon
+                SELECT cluster as leader_a, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_a
                 FROM rec_clusters, stations WHERE station_id = id
                 AND level = (select max(level) from rec_clusters r where r.station_id = id)
                 GROUP BY cluster ) AS tc1,
                 (
-                SELECT cluster as leader_b, AVG(latitude) AS lat, AVG(longitude) AS lon
+                SELECT cluster as leader_b, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_b
                 FROM rec_clusters, stations WHERE station_id = id
                 AND level = (select max(level) from rec_clusters r where r.station_id = id)
                 GROUP BY cluster ) AS tc2)   
@@ -278,62 +325,111 @@ rec_clusters AS ( --merge close enough clusters togheter
         ORDER BY distance_km ASC LIMIT 2
     ) AS to_merge 
     WHERE rc.cluster = to_merge.leader_a
-)
-select station_id, cluster from rec_clusters rc
-where level = (select max(level) from rec_clusters h where h.station_id = rc.station_id);
+),
+result_clusters  AS (
+    SELECT station_id, cluster as cluster_name, DENSE_RANK() OVER (ORDER BY cluster) AS cluster_id, 
+    FROM rec_clusters rc, 
+    WHERE level = (select max(level) from rec_clusters h where h.station_id = rc.station_id)
+),
 ```
 
-The merged clusters now look like this:
+We add a final step to prettify the names of the clusters, to check out the entire query look at [sql/clustering/ClusterStations.sql](./sql/clustering/ClusterStations.sql).
+
+Now, let’s visualize the final clusters on a map using Python (`cluster_stations.py`):
 
 <iframe src="plots/stations_clusters.html" width="100%" height="600" style="border: 1px solid #ccc;"></iframe>
 
-The entire query can be found in `ClusterStations.sql`, and the plots are realized with `cluster_stations.py`.
+We can save the clusters in a table `stations_clusters`, and re-propose the analysis we did for the city centers for city areas with (extending the CTE `curr_prices`):
 
-
-
-Assuming we store our final clusters' mappings in `stations_clusters`, we can extend `PriceAt` with a similar aggregation to the one for city names
-
-```postgresql
-clusters AS(
-    SELECT cluster, COUNT(*) n_stations, AVG(price) avg_price
-    FROM open_curr_price p ,stations_clusters c WHERE p.station_id = c.station_id
-    GROUP BY cluster ORDER BY n_stations DESC
-)
-select cluster, n_stations, avg_price::NUMERIC(10, 3) AS avg_price
-from clusters order by avg_price;
+```sql
+SELECT short_cluster_name, count(*) as n_open_station, avg(price) as average_price
+FROM curr_prices p, stations_clusters sc
+WHERE p.station_id = sc.station_id
+GROUP BY cluster_id, short_cluster_name
+ORDER BY average_price;
 ```
 
 ```postgresql
-                        cluster                        | n_stations | avg_price 
--------------------------------------------------------+------------+-----------
- Chemnitz                                              |        127 |     1.514
- Köln, Bonn, Aachen                                    |        563 |     1.516
- Mannheim, Karlsruhe                                   |        543 |     1.519
- Münster, Hamm, Bielefeld, Osnabrück                   |        700 |     1.519
- Oldenburg, Bremen                                     |        309 |     1.522
- Berlin                                                |        397 |     1.523
- Regensburg                                            |        105 |     1.526
- Hagen, Dortmund, Gelsenkirchen, Essen, Bochum, Mön... |       1271 |     1.527
- Magdeburg                                             |         98 |     1.534
- Frankfurt am Main, Wiesbaden                          |        507 |     1.540
- Leipzig                                               |        152 |     1.545
- Stuttgart                                             |        374 |     1.545
- Hamburg, Lübeck                                       |        483 |     1.551
- Augsburg, München                                     |        415 |     1.552
- Dresden                                               |        110 |     1.560
- Kiel                                                  |         96 |     1.568
- Kassel                                                |        124 |     1.571
- Nürnberg                                              |        230 |     1.575
- Hannover, Braunschweig                                |        372 |     1.576
+   short_cluster_name    | n_open_station |      average_price       
+-------------------------+----------------+--------------------------
+ Köln, Bonn              |            431 | 1.6610162412993039443155
+ Karlsruhe, Mannheim     |            540 | 1.6739796296296296296296
+ Bielefeld               |            286 | 1.6741888111888111888111
+ Dortmund, Düsseldorf... |           1297 | 1.6756337702390131071703
+ Frankfurt am Main       |            392 | 1.6811862244897959183673
+ Münster                 |            156 | 1.6819807692307692307692
+ Stuttgart               |            365 | 1.6835315068493150684931
+ Bremen                  |            190 | 1.6897631578947368421052
+ Hannover                |            228 | 1.6921140350877192982456
+ Berlin                  |            392 | 1.6948035714285714285714
+ Hamburg                 |            371 | 1.6966388140161725067385
+ Nürnberg                |            229 | 1.6992838427947598253275
+ Dresden                 |            110 | 1.7006090909090909090909
+ München, Augsburg       |            396 | 1.7067575757575757575757
+ Chemnitz                |            127 | 1.7392125984251968503937
+ Leipzig                 |            149 | 1.7774362416107382550335
 ```
 
-Where I limited the cluster label length to 50 chars , the only label cut also includes `Mönchengladbach, Duisburg, Krefeld, Düsseldorf, Wuppertal`. 
+We see that our intuition matches the data, the average price in a city area is strongly correlated to the average price in the city center.
 
-**We can observe how a city area generally has prices similar to those of the city center.**
+Plotting it in Grafana:
+
+![](./plots/city_area_prices.png)
+
+### Comparing Brands 
+
+So far, we’ve explored how fuel prices vary by location at a given time. Another common insight among drivers is that *some brands tend to be cheaper than others*.
+
+To investigate this, we’ll average fuel prices across the country for different top brands—extending our usual CTE `curr_prices`.
+
+```sql
+SELECT * FROM (
+    SELECT brand, COUNT(*) n_stations, AVG(price) average_price
+    FROM curr_prices
+    WHERE brand <> ''
+    GROUP BY brand 
+    ORDER BY n_stations DESC LIMIT 10
+) ORDER BY average_price;
+```
+
+```postgresql
+     brand     | n_stations |      average_price       
+---------------+------------+--------------------------
+ Jet           |        687 | 1.6683595342066957787481
+ Raiffeisen    |        391 | 1.6730818414322250639386
+ Star          |        485 | 1.6740515463917525773195
+ Hem           |        394 | 1.6771979695431472081218
+ Avia          |        634 | 1.6863974763406940063091
+ Esso          |       1162 | 1.6951531841652323580034
+ Totalenergies |        759 | 1.6989736495388669301712
+ Shell         |       1712 | 1.7111787383177570093457
+ Aral          |       2197 | 1.7115261720527992717341
+ Agip Eni      |        470 | 1.7357872340425531914893
+```
+
+And in Grafana:
+
+![](./plots/brand_prices.png)
 
 
 
-## Updates Frequencies Analysis
+**From Nationwide to Local Price Analysis**
+
+So far, we’ve analyzed fuel prices across the entire country. While interesting, most people care more about prices in their **local area**.
+
+Fortunately, it’s easy to tweak our queries to filter stations based on their distance from a given point. This will be key when we build an **interactive dashboard** for real-time price tracking.
+
+## Time-Series Analysis
+
+TODO...
+
+
+
+
+
+
+
+### Updates Frequencies Analysis
 
 MTS-K records the history of price changes for fuel stations in Germany. One would like to analyze the price updates frequencies to answer the following question:
 

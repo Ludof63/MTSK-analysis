@@ -6,7 +6,7 @@ WITH RECURSIVE param AS (
 ),
 top_cities AS ( --start from the top cities
     SELECT city, AVG(latitude) AS lat, AVG(longitude) AS lon,
-    FROM stations GROUP BY city HAVING COUNT(*) > 30
+    FROM stations GROUP BY city HAVING COUNT(*) > 40
 ),
 clusters AS ( --assign a station to the closest top_city 
     SELECT station_id, leader as cluster

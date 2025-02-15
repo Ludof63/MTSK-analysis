@@ -12,7 +12,7 @@ active_stations AS(
 alwaysopen AS(
     SELECT s.* FROM active_stations s WHERE s.always_open 
 ),
-flextime_open AS(
+flextime AS(
     SELECT s.*
     FROM param, stations_times st, active_stations s
     WHERE st.station_id = s.station_id
@@ -20,7 +20,7 @@ flextime_open AS(
         AND time_t BETWEEN time_t::date + open_time AND time_t::date + close_time -- opening hours?
 ),
 open_stations AS (
-    SELECT * FROM alwaysopen UNION ALL SELECT *  FROM flextime_open
+    SELECT * FROM alwaysopen UNION ALL SELECT *  FROM flextime
 ),
 open_curr_price AS (
     SELECT open_stations.*, p.price, p.time
@@ -51,56 +51,4 @@ SELECT COUNT(*) from open_stations;
 SELECT 
  (select count(station_id) from flextime_open) as n_flextime,
  (select count(station_id) from alwaysopen) as n_alwaysopen;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-WITH param AS (
-    SELECT 
-    (select max(time) from prices) as time_t,
-    (CASE WHEN EXTRACT(dow FROM time_t) = 0 THEN 6 ELSE EXTRACT(dow FROM time_t) -1 END ) as day_bit,
-),
-active_stations AS(
-    SELECT s.id as station_id, city, brand, always_open, first_active 
-    FROM param, stations s 
-    WHERE first_active <= time_t AND
-    EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND time BETWEEN time_t - INTERVAL '3 day' AND time_t)-- avoid inactive stations
-),
-alwaysopen AS(
-    SELECT s.*
-    FROM param, active_stations s
-    WHERE s.always_open 
-),
-flextime_open AS(
-    SELECT s.*
-    FROM param, stations_times st, active_stations s
-    WHERE st.station_id = s.station_id
-        AND (days & (1 << (day_bit))) > 0 -- open day?
-        AND time_t BETWEEN time_t::date + open_time AND time_t::date + close_time -- opening hours?
-),
-open_stations AS (
-    SELECT * FROM alwaysopen UNION ALL SELECT *  FROM flextime_open
-)
-select count(station_id) as cnt from flextime_open;
-
-select NOW() - (select max(time) from prices);
-
-select count(DISTINCT station_id) from stations_times;
-
-SELECT justify_hours(now() - (SELECT max(time) FROM prices)) as delta;
-
-
-SELECT EXTRACT(EPOCH FROM (NOW() - MAX(time)))::INT || 's' AS time_difference
-FROM prices;
 

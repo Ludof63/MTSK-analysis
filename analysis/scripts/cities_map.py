@@ -6,20 +6,28 @@ import folium, random
 OUTPUT_FILENAME="cities_map.html"
 
 QUERY="""
-    SELECT city, AVG(latitude) AS lat, AVG(longitude) AS lon,
-    FROM stations GROUP BY city HAVING COUNT(*) > 30
+    SELECT id as station_id, city, latitude, longitude
+    FROM stations 
+    WHERE city IN (select city from stations group by city having count(*) > 40);
     """
 
 
 def plot():
     generated_colors = set()
-    def generate_color():
+    def generate_color() -> str:
         while True:
             color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
-            
             if color not in generated_colors:
                 generated_colors.add(color)
                 return color
+
+
+    city_to_color : dict[str, str] = {}
+    def get_city_color(city : str) -> str:
+        if city not in city_to_color:
+            city_to_color[city] = generate_color()
+        return city_to_color[city]
+    
     
     df = run_query(QUERY)
     print(f"Query done | Available columns: {df.columns}")
@@ -28,19 +36,19 @@ def plot():
     folium.TileLayer("CartoDB Positron",control=False).add_to(m)
 
     for idx, row in df.iterrows():
-            color=generate_color()
-            for i in range(row['n_stations']):
-                marker = folium.CircleMarker(
-                    location=[row['lats'][i], row['lons'][i]],
-                    tooltip=row['city'],
-                    fill=True,
-                    fill_opacity=1,
-                    opacity=1,
-                    fill_color=color,
-                    color=color,
-                    radius=2,
-                )
-                marker.add_to(m)
+        color = get_city_color(row['city'])
+        marker = folium.CircleMarker(
+            location=[row['latitude'], row['longitude']],
+            tooltip=row['city'],
+            fill=True,
+            fill_opacity=1,
+            opacity=1,
+            fill_color=color,
+            color=color,
+            radius=2,
+            popup=f"id:{row['station_id']}\ncity:{row['city']})"
+        )
+        marker.add_to(m)
 
     print("Plotting done")
     m.save(os.path.join(OUTPUT_FOLDER,OUTPUT_FILENAME))

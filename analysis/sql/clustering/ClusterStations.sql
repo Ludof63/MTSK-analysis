@@ -6,7 +6,7 @@ WITH RECURSIVE param AS (
 ),
 top_cities AS ( --start from the top cities
     SELECT city, AVG(latitude) AS lat, AVG(longitude) AS lon
-    FROM stations GROUP BY city HAVING COUNT(*) > 30
+    FROM stations GROUP BY city HAVING COUNT(*) > 40
 ),
 clusters AS ( --assign a station to the closest top_city 
     SELECT station_id, leader as cluster
@@ -79,7 +79,7 @@ city_cluster AS (
 ),
 final_clusters AS (
     SELECT station_id, old.cluster_id, new_name as cluster_name, 
-        CASE WHEN LENGTH(cluster_name) > 20 THEN LEFT(cluster_name, 20) || '...' ELSE cluster_name END AS short_cluster_name
+        CASE WHEN LENGTH(new_name) > 20 THEN LEFT(new_name, 20) || '...' ELSE new_name END AS short_cluster_name
     FROM result_clusters old, 
         ( SELECT cluster_id, array_to_string(array_agg(city ORDER BY city_size DESC), ', ') AS new_name
         FROM city_cluster
