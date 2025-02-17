@@ -6,7 +6,7 @@ from folium.plugins import MarkerCluster
 import branca.colormap as cm
 
 
-QUERY="../sql/PriceAt.sql"
+QUERY="../sql/point_in_time/PriceAt.sql"
 OUTPUT_FILENAME="prices_on_map.html"
 VALUE_COL="price"
 
@@ -65,7 +65,7 @@ def get_color(z_score):
 
 # Query prices for a certain fuel and create a markerCluster out of them
 def create_cluster(fuel : str) -> MarkerCluster:
-    df = run_query(read_query(QUERY))
+    df = run_query(read_query(QUERY,[replace_fuel_gen(fuel)]))
     print(f"Query done for {fuel}")
 
     mean_value, std_dev = df[VALUE_COL].mean(),df[VALUE_COL].std()

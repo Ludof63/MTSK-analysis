@@ -13,6 +13,7 @@ services:
     container_name: grafana
     image: grafana/grafana:latest
     environment:
+      GF_INSTALL_PLUGINS: ae3e-plotly-panel
       GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 100ms
       GF_RENDERING_SERVER_URL: http://renderer:8081/render
       GF_RENDERING_CALLBACK_URL: http://grafana:3000/

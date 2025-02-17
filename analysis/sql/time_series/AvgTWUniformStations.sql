@@ -16,7 +16,8 @@ time_series AS (
     FROM param, generate_series(0, (param.number_seconds / param.interval_seconds)) AS i
 ),
 active_stations AS(
-    SELECT s.id as station_id, city, brand, always_open, first_active FROM stations s, param
+    SELECT s.id as station_id, city, brand, always_open, first_active 
+    FROM stations s, param
     WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN end_t - INTERVAL '3 day' AND end_t)-- avoid inactive stations
 ),
 stations_prices AS (
@@ -32,7 +33,7 @@ stations_prices AS (
         SELECT time as valid_from, diesel as price
         FROM prices pp, param
         WHERE s.station_id = pp.station_uuid AND diesel_change IN (1,3)
-        AND time <= param.start_t AND time >= param.start_t - '2 day'::INTERVAL 
+        AND time <= param.start_t AND time >= param.start_t - '3 day'::INTERVAL 
         ORDER BY time DESC LIMIT 1
     ) p
 ),
@@ -45,10 +46,9 @@ prices_time_series AS (
     FROM  time_series ts, prices_intervals p_int,
     WHERE (valid_from,valid_until) OVERLAPS (bucket_start, bucket_end)
 )
-select bucket_start as datetime, SUM(price * duration_seconds) / SUM(duration_seconds) as avg_diesel_price,
-from prices_time_series
-group by datetime
-order by datetime;
+SELECT bucket_start as datetime, SUM(price * duration_seconds) / SUM(duration_seconds) as avg_diesel_price,
+FROM prices_time_series
+GROUP BY datetime ORDER BY datetime;
 
 
 

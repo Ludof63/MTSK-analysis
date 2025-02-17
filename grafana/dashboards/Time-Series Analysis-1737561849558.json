@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -230,7 +230,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "WITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nupdates AS (\n    SELECT bucket_start, station_uuid\n    FROM prices, time_series\n    WHERE \n        (diesel_change IN (1,3) OR e5_change IN (1,3) OR e10_change IN (1,3))\n        AND time BETWEEN bucket_start AND bucket_end\n)\nselect bucket_start as datetime, count(*)\nfrom updates\ngroup by datetime\norder by datetime;",
+          "rawSql": "WITH param AS (\n    SELECT\n    $__timeFrom()::TIMESTAMP AS start_t,\n    $__timeTo()::TIMESTAMP AS end_t,\n    '1 $time_granularity'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nupdates AS (\n    SELECT bucket_start, station_uuid\n    FROM prices, time_series\n    WHERE (diesel_change IN (1,3) OR e5_change IN (1,3) OR e10_change IN (1,3))\n        AND time BETWEEN bucket_start AND bucket_end\n)\nSELECT bucket_start as datetime, count(*) as n_updates\nFROM updates\nGROUP BY datetime ORDER BY datetime;",
           "refId": "A",
           "sql": {
             "columns": [
@@ -264,7 +264,7 @@
       },
       "id": 4,
       "panels": [],
-      "title": "Price Average Over Time",
+      "title": "Price Average Over Time: $fuel",
       "type": "row"
     },
     {
@@ -310,6 +310,7 @@
               "mode": "off"
             }
           },
+          "decimals": 3,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -323,7 +324,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "currencyEUR"
         },
         "overrides": []
       },
@@ -377,7 +379,7 @@
           }
         }
       ],
-      "title": "Wrong Average Over Time",
+      "title": "Date_Trunc Average Over Time",
       "type": "timeseries"
     },
     {
@@ -424,6 +426,7 @@
               "mode": "off"
             }
           },
+          "decimals": 3,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -437,7 +440,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "currencyEUR"
         },
         "overrides": []
       },
@@ -487,7 +491,7 @@
           }
         }
       ],
-      "title": "Time-Weighted Price Average Over Time with Uniform Stations (wrong?)",
+      "title": "Time-Weighted Average Over Time with Uniform Stations",
       "type": "timeseries"
     },
     {
@@ -534,6 +538,7 @@
               "mode": "off"
             }
           },
+          "decimals": 3,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -541,13 +546,10 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
-          }
+          },
+          "unit": "currencyEUR"
         },
         "overrides": []
       },
@@ -597,7 +599,7 @@
           }
         }
       ],
-      "title": "Time-Weighted Price Average Over Time",
+      "title": "Time-Weighted Average Over Time",
       "type": "timeseries"
     },
     {
@@ -610,7 +612,7 @@
       },
       "id": 7,
       "panels": [],
-      "title": "Cities Comparison Over Time",
+      "title": "Cities Comparison Over Time: $cities",
       "type": "row"
     },
     {
@@ -661,6 +663,7 @@
               "mode": "off"
             }
           },
+          "decimals": 3,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -670,7 +673,8 @@
                 "value": null
               }
             ]
-          }
+          },
+          "unit": "currencyEUR"
         },
         "overrides": []
       },
@@ -1044,6 +1048,6 @@
   "timezone": "utc",
   "title": "Time-Series Analysis",
   "uid": "eearom40cn400d",
-  "version": 36,
+  "version": 5,
   "weekStart": "monday"
 }
