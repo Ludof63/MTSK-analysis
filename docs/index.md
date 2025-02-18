@@ -1,6 +1,10 @@
 ---
+​---
 layout: default
+title: MTSK Analysis
+​---
 ---
+
 # Analysis of Fuel Prices in Germany
 
 Fuel prices impact all of us—whether we’re commuting to work, planning a road trip, or managing logistics for a business. But have you ever wondered how fuel prices fluctuate and what insights we can gain from this data?
@@ -11,20 +15,20 @@ The [Markttransparenzstelle für Kraftstoffe (MTS-K)](https://www.bundeskartella
 
 We’ll use **SQL** for querying and **Python & Grafana** for visualizations. Most queries and visualizations can be explored in an **interactive Grafana dashboard**, where you can tweak parameters. Some interactive maps are plotted with Python.
 
-**Want to follow along?** Check out the setup instructions [here]([repo]/README.md) to download and load the dataset. Then access Grafana at http://localhost:3000 (user: `admin`, password: `admin`), each section will link to the specific dashboard.
+**Want to follow along?** Check out the setup instructions [here](https://github.com/Ludof63/MTSK-analysis) to download and load the dataset. Then access Grafana at http://localhost:3000 (user: `admin`, password: `admin`), each section will link to the specific dashboard.
 
 **Structure of the Analysis**
 
 We’ll take a step-by-step approach to uncover insights from the data:
 
 1. **[Understanding the Dataset](#understanding-the-dataset):** First, we introduce the schema and key properties of the dataset.
-2. **[Point-in-Time Analysis](#point-in-Time Analysis):** We then examine fuel prices at specific moment to identify moments to identify trends and regional differences.
-3. **[Time-Series Analysis](##Time-Series-Analysis):** Here, we will focus on how prices evolve over time, trying to spot patterns and fluctuations.
-4. [Real-Time Price Analysis](#Real-Time-Price-Analysis): Finally, we design a real-time analysis using Grafana, assuming continuous data ingestion into our database. This showcases the power of *Hybrid Transactional/Analytical Processing (HTAP) databases* for real-time insights.
+2. **[Point-in-Time Analysis](#point-in-time-analysis):** We then examine fuel prices at specific moment to identify moments to identify trends and regional differences.
+3. **[Time-Series Analysis](#time-series-analysis):** Here, we will focus on how prices evolve over time, trying to spot patterns and fluctuations.
+4.  [**Real-Time Price Analysis**](#real-time-price-analysis) Finally, we design a real-time analysis using Grafana, assuming continuous data ingestion into our database. This showcases the power of *Hybrid Transactional/Analytical Processing (HTAP) databases* for real-time insights.
 
 ## Understanding the Dataset
 
-Our analysis is based on the schema defined in [sql/schema.sql](../sql/schema.sql), which consists of three main tables:
+Our analysis is based on the schema defined in `/sql/schema.sql`, which consists of three main tables:
 
 - **stations**: Contains information about each fuel station.
 - **stations_times**: Stores the opening hours for each station.
@@ -37,7 +41,7 @@ There are several important aspects to consider when working with this data:
 - A price `p` for a fuel `f` for a certain station `s` is valid until the next update in time for `f` for `s`
 - For a fuel `fuel` I should only consider the price events with `fuel_change IN (1,3)`. 
 - There are 2 types of stations: **Always-Open** and  **Flex-Time** stations. Flex-Time stations have their opening hours recorded in `stations_times`.
-- Some stations in the dataset are inactive. We classify a station as inactive if it hasn’t updated its prices in the last three days (we will discuss how we arrived at this threshold when we will analyze [Update Frequency by Station](#Update-Frequency-by-Station)).
+- Some stations in the dataset are inactive. We classify a station as inactive if it hasn’t updated its prices in the last three days (we will discuss how we arrived at this threshold when we will analyze [Update Frequency by Station](#update-frequency-by-station)).
 
 The dataset covers three fuel types: diesel, e5, e10. In most cases, we’ll use diesel prices as examples, but the analysis applies to other fuels by adjusting the relevant attributes. Additionally, in the Time-Series analysis, we will examine whether fuel prices exhibit temporal correlations (spoiler: they do).
 
@@ -429,7 +433,7 @@ This chapter shifts from static analysis to time-series exploration, focusing on
 - **How do fuel prices fluctuate over time?**
   We'll analyze price variations at different intervals—hourly (e.g., are prices lower at night?), daily (e.g., are certain days cheaper?), and event-based changes. We'll also examine correlations between fuel types, cities, and brands, culminating in a Grafana dashboard for deeper insights.
 - **How are price updates distributed over time?**
-  Understanding update patterns helps us extract useful statistics and prepare for [Real-Time Monitoring](), where we simulate real-time price analysis by replaying parts of the dataset.
+  Understanding update patterns helps us extract useful statistics and prepare for [Real-Time Price Analysis](#real-time-price-analysis), where we simulate real-time price analysis by replaying parts of the dataset.
 
 *The examples in this chapter highlight key insights using selected parameters, but you’re not limited to these views. With the Grafana dashboards, you can drill down into the data, filter by your own criteria, and uncover even more trends*
 
@@ -443,7 +447,7 @@ Since we don’t want a single average for the entire period but rather a time s
 
 #### Average Price Over Time
 
-Recalling the properties we introduced in [Understanding the Dataset](##"Understanding the Dataset"), we could think to start from the following simple and efficient (but wrong) query:
+Recalling the properties we introduced in [Understanding the Dataset](#understanding-the-dataset), we could think to start from the following simple and efficient (but wrong) query:
 
 ##### Date_Trunc Average
 
@@ -477,7 +481,7 @@ Looking at the plots, we can start spotting trends. For instance, prices on the 
 
 **What are missing?**
 
-Recalling [Understanding the Dataset](##"Understanding the Dataset"), we’re overlooking two key aspects:
+Recalling [Understanding the Dataset](#understanding-the-dataset), we’re overlooking two key aspects:
 
 - A price `p` for a fuel `f` for a certain station `s` is valid until the next update in time for `f` for `s`
 - Not all stations operate the same way—some are **AlwaysOpen**, while others follow **FlexTime** schedules.
