@@ -1,7 +1,5 @@
 ---
-​---
-layout: home
-​---
+layout: base
 ---
 
 # Analysis of Fuel Prices in Germany

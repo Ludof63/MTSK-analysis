@@ -1,3 +1,9 @@
 remote_theme: jekyll/minima
 
-title: Your awesome title
+title: MTS-K Analysis
+
+header_pages:
+  -
+
+kramdown:
+  syntax_highlighter: rouge
