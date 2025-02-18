@@ -109,7 +109,6 @@ def main():
     price_files : list[tuple[str,str]] = []
     for root, _, files in os.walk(args.price_folder):
         for file in files:
-            print(file)
             if file.endswith("-prices.csv"):
                 if file.split("-prices.csv")[0] >= max_time_str:
                     price_files.append((file,os.path.join(root, file)))

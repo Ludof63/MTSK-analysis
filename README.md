@@ -10,7 +10,7 @@ The [Markttransparenzstelle für Kraftstoffe](https://www.bundeskartellamt.de/DE
 
 [CedarDB](https://cedardb.com), a postgres-compliant [HTAP](https://en.wikipedia.org/wiki/Hybrid_transactional/analytical_processing) relational database, allows us to use one db for both the data analysis and the transactional workload.
 
-You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-analysis/analysis/).** Or you can follow the next steps and run some queries on the dataset yourself.
+You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-analysis/).** To play around with the dashboards or run some query on the dataset yourself, you can follow the following steps to download and load the dataset.
 
 ## Getting Started
 
@@ -20,13 +20,13 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
 
    - **Stations**: this repository contains an already prepared version of the stations in `data/` (updated weekly, max 1-week lag, more details [here](./scripts/data_preparation.md)) 
 
-   - Prices: the history of price updates. You can download it with
+   - **Prices:** the history of price updates. You can download it with
 
      ```bash
      ./scripts/download.sh -p 2024/01 2024/12
      ```
 
-     This will download prices from 2024/01 to 2024/12, saving them in `data/prices/`, around 13 GB uncompressed ([ script's documentation](./scripts/README.md))
+     This will download prices from 2024/01 to 2024/12, saving them in `data/prices/`, around 13 GB uncompressed ([script's documentation](./scripts/README.md))
 
 2. ### Start the Database
 
@@ -150,12 +150,9 @@ You can **take a look at the analysis [here](https://ludof63.github.io/MTSK-anal
      ), 
      stats AS (
          SELECT AVG(price) AS avg_price, STDDEV(price) AS std_dev_price FROM open_curr_price
-     ) -----------
-     -- Average Price Now
+     )
      SELECT avg_price from stats;
      ```
 
-
-
-If you want to continue with a more in depth exploration of the dataset you take a look at the [analysis](https://ludof63.github.io/MTSK-analysis/analysis/).
+You can continue to explore on your own or play around with the dashboard by following the [analysis blog](https://ludof63.github.io/MTSK-analysis/).
 

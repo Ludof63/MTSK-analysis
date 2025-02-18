@@ -21,7 +21,10 @@ flextime AS(
 open_stations AS (
     SELECT * FROM alwaysopen UNION ALL SELECT * FROM flextime
 )
-SELECT 
+SELECT
     (select count(station_id) from flextime) as n_flextime,
     (select count(station_id) from alwaysopen) as n_alwaysopen,
     n_flextime + n_alwaysopen as n_open_stations;
+
+-- SELECT count(station_id) as n_open_stations FROM open_stations;
+

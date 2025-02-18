@@ -306,8 +306,8 @@
             "autorange": true,
             "gridcolor": "#ddd",
             "range": [
-              1.6639019279105562,
-              1.7402448403386925
+              1.663637627757165,
+              1.7405091404920838
             ],
             "title": {
               "text": "Average Fuel Price (€)"
@@ -592,8 +592,8 @@
             "autorange": true,
             "gridcolor": "#ddd",
             "range": [
-              1.6267935907528035,
-              1.8148763279463835
+              1.6262635581228502,
+              1.8154063605763369
             ],
             "title": {
               "text": "Average Fuel Price (€)"
@@ -789,8 +789,8 @@
             "autorange": true,
             "gridcolor": "#ddd",
             "range": [
-              1.6593394603332194,
-              1.7845903801395389
+              1.6589864929348308,
+              1.7849433475379275
             ],
             "title": {
               "text": "Average Fuel Price (€)"
@@ -995,6 +995,6 @@
   "timezone": "utc",
   "title": "Point-In-Time Analysis",
   "uid": "becy9p326gow0f",
-  "version": 29,
+  "version": 1,
   "weekStart": "monday"
 }

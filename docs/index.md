@@ -811,8 +811,61 @@ FROM stats;
   96.652400
 ```
 
-We would classify as false inactive stations less that 3.5% of the stations.
+*We would classify as false inactive stations less that 3.5% of the stations.*
 
 ## Real-Time Price Analysis
 
-TODO
+So far, we’ve analyzed *historical fuel price data*, but prices don’t just exist in the past—they *constantly change*. This is exactly why the [Markttransparenzstelle für Kraftstoffe (MTS-K)](https://www.bundeskartellamt.de/DE/Aufgaben/MarkttransparenzstelleFuerKraftstoffe/MTS-K_Infotext/mts-k_node.html) was created: fuel stations report their real-time prices to a central system, allowing drivers to find the best deals nearby via apps.
+
+Ideally, we’d stream live data from the API, but since we already have historical data, we can **replay price changes over time** instead. This lets us *simulate real-time updates* while adjusting the speed as needed—fast-forwarding hours or even days in minutes.
+
+#### Getting Started
+
+Follow the [setup tutorial](https://github.com/ludof63/MTSK-analysis) and run the client to replay the workload at your preferred speed (keeping in mind your machine’s power). Once set up, you can explore real-time dashboards in Grafana:
+
+- **[Real-Time](http://localhost:3000/d/febgp3afngr28c/real-time)**: Tracks national real-time stats—e.g., insertion rate, recent prices, average fuel prices, and the distribution of open stations.
+- **[Current Prices in Local Area](http://localhost:3000/d/febgp3afngr28f/current-prices-in-local-area)**: Allows you to analyze fuel prices in a specific area (as we did in [Prices Over Time in a Local Area](#prices-over-time-in-a-local-area) , compare stations by price/distance, and view real-time statistics.
+
+#### The Power of an HTAP Database
+
+This chapter will be brief because there aren’t many changes to discuss. Thanks to our **HTAP database**, we don’t need to complicate our solution by introducing a separate transactional database and periodically syncing data with an analytical one—the standard approach. Instead, we can i*ngest replayed updates directly* while seamlessly powering our Grafana dashboards with the freshest data, all with minimal effort.
+
+Now, the only question left is:
+
+### **How do we adapt our queries for real-time analysis?**
+
+Setting up real-time visualization is straightforward since we can *reuse the queries* from previous sections. Since we've always parameterized by time, we only need to tweak this parameterization:
+
+- **Switching from a fixed point-in-time to the current time**. We simply take the latest price update as our reference point
+
+  ```sql
+  SELECT max(time) as current_time FROM prices
+  ```
+
+- **Adapting time-series queries for recent prices**: Instead of querying a fixed historical period, we now consider a dynamic range [current_time - range, current_time], where `range` determines how far back we look. In SQL, this means adjusting our parameters, for example, changing this:
+
+  ```sql
+  WITH param AS (
+      SELECT
+      '2024-01-08T00:00:00Z'::TIMESTAMP AS start_t,
+      '2024-01-21T23:59:59Z'::TIMESTAMP AS end_t,
+      '1 hour'::INTERVAL AS time_granularity,
+       EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
+  ),
+  ```
+
+
+  to this
+
+  ```sql
+  WITH param AS (
+      SELECT
+      (select max(time) from prices) as end_t,
+      '10 hours'::INTERVAL AS range_t,
+      end_t - range_t as start_t,
+      '1 hour'::INTERVAL AS time_granularity,
+       EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,
+  ),
+  ```
+
+  
