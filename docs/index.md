@@ -1,6 +1,6 @@
 ---
 ​---
-layout: default
+layout: home
 ​---
 ---
 
@@ -14,7 +14,7 @@ The [Markttransparenzstelle für Kraftstoffe (MTS-K)](https://www.bundeskartella
 
 We’ll use **SQL** for querying and **Python & Grafana** for visualizations. Most queries and visualizations can be explored in an **interactive Grafana dashboard**, where you can tweak parameters. Some interactive maps are plotted with Python.
 
-**Want to follow along?** Check out the setup instructions [here](https://github.com/Ludof63/MTSK-analysis) to download and load the dataset. Then access Grafana at http://localhost:3000 (user: `admin`, password: `admin`), each section will link to the specific dashboard.
+**Want to follow along?** Check out the setup instructions [here](https://github.com/Ludof63/MTSK-analysis) to download and load the dataset. Then access Grafana at [http://localhost:3000](http://localhost:3000) (user: `admin`, password: `admin`), each section will link to the specific dashboard.
 
 **Structure of the Analysis**
 

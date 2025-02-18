@@ -1,1 +1,3 @@
-theme: minima
+remote_theme: jekyll/minima
+
+title: Your awesome title
