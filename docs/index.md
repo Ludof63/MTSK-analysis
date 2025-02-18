@@ -1,3 +1,6 @@
+---
+layout: default
+---
 # Analysis of Fuel Prices in Germany
 
 Fuel prices impact all of us—whether we’re commuting to work, planning a road trip, or managing logistics for a business. But have you ever wondered how fuel prices fluctuate and what insights we can gain from this data?
@@ -8,16 +11,16 @@ The [Markttransparenzstelle für Kraftstoffe (MTS-K)](https://www.bundeskartella
 
 We’ll use **SQL** for querying and **Python & Grafana** for visualizations. Most queries and visualizations can be explored in an **interactive Grafana dashboard**, where you can tweak parameters. Some interactive maps are plotted with Python.
 
-**Want to follow along?** Check out the setup instructions [here](../README.md) to download and load the dataset. Then access Grafana at http://localhost:3000 (user: `admin`, password: `admin`), each section will link to the specific dashboard.
+**Want to follow along?** Check out the setup instructions [here]([repo]/README.md) to download and load the dataset. Then access Grafana at http://localhost:3000 (user: `admin`, password: `admin`), each section will link to the specific dashboard.
 
 **Structure of the Analysis**
 
 We’ll take a step-by-step approach to uncover insights from the data:
 
-1. **[Understanding the Dataset](#Introduction):** First, we introduce the schema and key properties of the dataset.
-2. **[Point-in-Time Analysis](#"Point-in-Time Analysis"):** We then examine fuel prices at specific moment to identify moments to identify trends and regional differences.
-3. **[Time-Series Analysis](##"Time-Series Analysis"):** Here, we will focus on how prices evolve over time, trying to spot patterns and fluctuations.
-4. [Real-Time Price Analysis](#"Real-Time Price Analysis"): Finally, we design a real-time analysis using Grafana, assuming continuous data ingestion into our database. This showcases the power of *Hybrid Transactional/Analytical Processing (HTAP) databases* for real-time insights.
+1. **[Understanding the Dataset](#understanding-the-dataset):** First, we introduce the schema and key properties of the dataset.
+2. **[Point-in-Time Analysis](#point-in-Time Analysis):** We then examine fuel prices at specific moment to identify moments to identify trends and regional differences.
+3. **[Time-Series Analysis](##Time-Series-Analysis):** Here, we will focus on how prices evolve over time, trying to spot patterns and fluctuations.
+4. [Real-Time Price Analysis](#Real-Time-Price-Analysis): Finally, we design a real-time analysis using Grafana, assuming continuous data ingestion into our database. This showcases the power of *Hybrid Transactional/Analytical Processing (HTAP) databases* for real-time insights.
 
 ## Understanding the Dataset
 
@@ -34,7 +37,7 @@ There are several important aspects to consider when working with this data:
 - A price `p` for a fuel `f` for a certain station `s` is valid until the next update in time for `f` for `s`
 - For a fuel `fuel` I should only consider the price events with `fuel_change IN (1,3)`. 
 - There are 2 types of stations: **Always-Open** and  **Flex-Time** stations. Flex-Time stations have their opening hours recorded in `stations_times`.
-- Some stations in the dataset are inactive. We classify a station as inactive if it hasn’t updated its prices in the last three days (we will discuss how we arrived at this threshold when we will analyze [Update Frequency by Station](#"Update Frequency by Station")).
+- Some stations in the dataset are inactive. We classify a station as inactive if it hasn’t updated its prices in the last three days (we will discuss how we arrived at this threshold when we will analyze [Update Frequency by Station](#Update-Frequency-by-Station)).
 
 The dataset covers three fuel types: diesel, e5, e10. In most cases, we’ll use diesel prices as examples, but the analysis applies to other fuels by adjusting the relevant attributes. Additionally, in the Time-Series analysis, we will examine whether fuel prices exhibit temporal correlations (spoiler: they do).
 
@@ -663,7 +666,7 @@ For example, we can compare Berlin, Hamburg and Munich daily diesel prices over 
 
 ![](./plots/time_series/cities_over_time.png)
 
-We can also reuse the clusters from [Clustering Stations by City Area](#"Clustering Stations by City Area") to compare fuel prices across different city areas or even between cities over time. You can explore these trends interactively in Grafana’s T*ime-Series Analysis* dashboard.
+We can also reuse the clusters from [Clustering Stations by City Area](#clustering-stations-by-city-area) to compare fuel prices across different city areas or even between cities over time. You can explore these trends interactively in Grafana’s T*ime-Series Analysis* dashboard.
 
 #### Prices Over Time in a Local Area
 
@@ -774,7 +777,7 @@ select * from station_frq;
 
 We can then plot the histogram with Grafana:
 
-![](/home/ludof/Documents/TUM/IDP-CedarDB/MTS-K/analysis/plots/time_series/update_freq_stations.png)
+![](./plots/time_series/update_freq_stations.png)
 
 We can clearly see how most of the stations update their prices on average withing 3 days. While the average is around 8 hours. But we can be more accurate and check the percentiles, extending the previous `station_frq` CTE, with:
 
