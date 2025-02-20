@@ -19,7 +19,7 @@ We’ll use **SQL** for querying and **Python & Grafana** for visualizations. Mo
 We’ll take a step-by-step approach to uncover insights from the data:
 
 1. **[Understanding the Dataset](#understanding-the-dataset):** First, we introduce the schema and key properties of the dataset.
-2. **[Point-in-Time Analysis](#point-in-time-analysis):** We then examine fuel prices at specific moment to identify moments to identify trends and regional differences.
+2. **[Point-in-Time Analysis](#point-in-time-analysis):** We then examine fuel prices at specific moment to identify trends and regional differences.
 3. **[Time-Series Analysis](#time-series-analysis):** Here, we will focus on how prices evolve over time, trying to spot patterns and fluctuations.
 4.  **[Real-Time Price Analysis](#real-time-price-analysis)**: Finally, we design a real-time analysis using Grafana, assuming continuous data ingestion into our database. This showcases the power of *Hybrid Transactional/Analytical Processing (HTAP) databases* for real-time insights.
 
