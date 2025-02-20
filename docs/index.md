@@ -48,7 +48,7 @@ After introducing the basic properties of our dataset, in this section we start 
 
 The first question one would like to give an answer to is, what is the current fuel price. Let's start by approximating it with **"what is the current average price over the entire country?"**. 
 
-> Grafana Dashboard: [Point-In-Time Analysis](http://localhost:3000/d/becy9p326gow0f/point-in-time-analysis)
+> Grafana Dashboard: [Point-in-Time Fuel Prices](http://localhost:3000/d/becy9p326gow0f/point-in-time-fuel-prices)
 
 ### Current Average Price
 
@@ -434,7 +434,7 @@ This chapter shifts from static analysis to time-series exploration, focusing on
 
 *The examples in this chapter highlight key insights using selected parameters, but you’re not limited to these views. With the Grafana dashboards, you can drill down into the data, filter by your own criteria, and uncover even more trends*
 
-> Grafana Dashboard: [Time-Series Analysis](http://localhost:3000/d/eearom40cn400d/time-series-analysis)
+> Grafana Dashboard: [Fuel Price Trends](http://localhost:3000/d/eearom40cn400d/fuel-price-trends?)
 
 ### Tracking Fuel Prices Over Time
 
@@ -671,9 +671,82 @@ We can also reuse the clusters from [Clustering Stations by City Area](#clusteri
 
 #### Prices Over Time in a Local Area
 
-While nationwide or city-wide trends are insightful, drivers typically care most about fuel prices **near where they live and refuel**. 
+> Grafana Dashboard:  [Local Fuel Price Trends](http://localhost:3000/d/febkp3afngr28d/local-fuel-price-trends)
 
-TODO
+While nationwide or city-wide trends are insightful, drivers typically care most about fuel prices **near where they live and refuel**. Luckily, we can adapt our queries, simply by filtering which stations we consider as active_stations, ignoring those not close enough to our location.
+
+Assume we extend our CTE `param`, with : 
+
+- `lat`, `lon` : coordinates of our location
+-  `dst_threshold`: radius in km from our location within which we consider stations
+
+For example, if we are in the center of Berlin and we want to consider stations up to 30 km from us:
+
+```sql
+WITH param AS (
+    SELECT  ...
+    52.50383 as lat, 13.3936 as lon, 30 AS dst_threshold
+),..
+```
+
+and then we can first filter those stations close enough to our location and then additionally filter out inactive stations:
+
+```sql
+close_enough_stations AS (
+    SELECT s.*
+    FROM param, ( 
+        SELECT s.*, 2 * 6371 * ATAN2(
+                SQRT(
+                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
+                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
+                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
+                ),
+                SQRT(1 - (
+                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
+                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
+                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
+                ))
+            ) AS dst_km
+        FROM stations s
+    ) as s
+    WHERE dst_km <= dst_threshold
+),
+active_stations AS(
+    SELECT s.id as station_id, s.*
+    FROM param, close_enough_stations s 
+   WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN start_t AND end_t)-- avoid inactive stations
+),
+```
+
+In our earlier analysis, we explored nationwide fuel price trends over time, revealing clear patterns—prices tend to rise at night and on weekends. Now, shifting our focus to a local area, we can test whether these trends hold true. By aggregating prices by day of the week and hour, we can determine the best times to fuel up locally.
+
+##### Best Time to Fuel Up in Your Area
+
+To do this, we use the query for the time-weighted average, filter for stations in our selected area, and aggregate the data by day and hour using the `prices_time_series` CTE. This allows us to pinpoint the most cost-effective times to fill up.
+
+```sql
+aggregation AS (
+    SELECT 
+        EXTRACT(dow FROM bucket_start) as dow, 
+        EXTRACT(HOUR FROM bucket_start) as hour,
+        CASE WHEN dow=0 THEN 7 ELSE dow END as dow_idx,
+        (ARRAY['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])[dow_idx] as day,
+        
+        SUM(price * duration_seconds) / SUM(duration_seconds) AS avg_price,
+    FROM prices_time_series
+    GROUP BY dow,hour
+)
+SELECT  ((dow_idx - 1) * 24) + hour as day_hour_idx, avg_price, day || ' ' || LPAD(hour::TEXT, 2, '0') as day_hour
+FROM aggregation
+ORDER BY dow_idx, hour;
+```
+
+In which `day_hour_idx` acts as x-axis in our plot in Grafana. If we consider diesel the center of Berlin, with a radius of 30 km from the 1/1/24 to 30/1/2024, the plot looks like:
+
+![](./plots/time_series/prices_week_berlin.png)
+
+The plot confirms, at least for this setting, the patterns we discovered before. 
+
 
 
 
@@ -821,10 +894,10 @@ Ideally, we’d stream live data from the API, but since we already have histori
 
 #### Getting Started
 
-Follow the [setup tutorial](https://github.com/ludof63/MTSK-analysis) and run the client to replay the workload at your preferred speed (keeping in mind your machine’s power). Once set up, you can explore real-time dashboards in Grafana:
+Follow the [setup tutorial](https://github.com/ludof63/MTSK-analysis) and run the client to replay the workload at your preferred speed (keeping in mind your machine’s power). Once set up, you can *explore real-time dashboards in Grafana*:
 
-- **[Real-Time](http://localhost:3000/d/febgp3afngr28c/real-time)**: Tracks national real-time stats—e.g., insertion rate, recent prices, average fuel prices, and the distribution of open stations.
-- **[Current Prices in Local Area](http://localhost:3000/d/febgp3afngr28f/current-prices-in-local-area)**: Allows you to analyze fuel prices in a specific area (as we did in [Prices Over Time in a Local Area](#prices-over-time-in-a-local-area) , compare stations by price/distance, and view real-time statistics.
+- **[Real-Time Fuel Prices](http://localhost:3000/d/febgp3afngr28c/real-time-fuel-prices)**: Tracks national real-time stats—e.g., insertion rate, recent prices, average fuel prices, and the distribution of open stations.
+- **[Real-Time Local Fuel Prices](http://localhost:3000/d/febgp3afngr28f/real-time-local-fuel-prices)**: Allows you to analyze fuel prices in a specific area (as we did in [Prices Over Time in a Local Area](#prices-over-time-in-a-local-area) , compare stations by price/distance, and view real-time statistics.
 
 #### The Power of an HTAP Database
 
