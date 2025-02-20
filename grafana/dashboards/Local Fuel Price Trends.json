@@ -1,0 +1,781 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Real-time analysis of the fuel prices in one area",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 6,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 3,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 13,
+        "x": 0,
+        "y": 0
+      },
+      "id": 14,
+      "interval": "$time_granularity",
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT  \n    (select max(time) from prices) as now_t,\n    $__timeTo()::TIMESTAMP as to_t,\n    (CASE WHEN to_t < now_t THEN to_t ELSE now_t END) as end_t,\n    $__timeFrom()::TIMESTAMP as start_t, \n    '${time_granularity}'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n     $latitude as lat, $longitude as lon, $dst_threshold AS dst_threshold\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nclose_enough_stations AS (\n    SELECT s.*\n    FROM param, ( \n        SELECT s.*, 2 * 6371 * ATAN2(\n                SQRT(\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ),\n                SQRT(1 - (\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ))\n            ) AS dst_km\n        FROM stations s\n    ) as s\n    WHERE dst_km <= dst_threshold\n),\nactive_stations AS(\n    SELECT s.id as station_id, s.*\n    FROM param, close_enough_stations s \n   WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN start_t AND end_t)-- avoid inactive stations\n),\nflextime_buckets AS(\n    SELECT bucket_start, s.station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM time_series, stations_times st, active_stations s\n    WHERE st.station_id = s.station_id  AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, station_id, bucket_start as from_t , bucket_end as to_t\n    FROM time_series, active_stations \n    WHERE always_open AND first_active <= bucket_start\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_prices AS (\n   SELECT time as valid_from, ${fuel:raw} as price, s.*\n    FROM param, prices p, active_stations s\n    WHERE s.station_id = p.station_uuid\n    AND ${fuel:raw}_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.* --add last event before start\n    FROM param, active_stations s, (\n        SELECT time as valid_from, ${fuel:raw} as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND ${fuel:raw}_change IN (1,3)\n        AND time <= start_t AND time >= start_t - '3 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t)\n)\nSELECT bucket_start as datetime, SUM(price * duration_seconds) / SUM(duration_seconds) as avg_${fuel:raw}_price,\nFROM prices_time_series\nGROUP BY datetime ORDER BY datetime;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Prices over Time ($fuel, every $time_granularity)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "description": "Average Time-Weighted Price Over the Period",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-GrYlRd"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "fieldMinMax": false,
+          "mappings": [
+            {
+              "options": {
+                "from": 2,
+                "result": {
+                  "color": "#000000",
+                  "index": 0
+                },
+                "to": 1000
+              },
+              "type": "range"
+            }
+          ],
+          "max": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 11,
+        "x": 13,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "basemap": {
+          "config": {
+            "showLabels": true,
+            "theme": "light"
+          },
+          "name": "Layer 0",
+          "opacity": 1,
+          "type": "carto"
+        },
+        "controls": {
+          "mouseWheelZoom": true,
+          "showAttribution": true,
+          "showDebug": false,
+          "showMeasure": false,
+          "showScale": false,
+          "showZoom": true
+        },
+        "layers": [
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": {
+                  "fixed": "dark-blue"
+                },
+                "opacity": 1,
+                "rotation": {
+                  "fixed": 0,
+                  "max": 360,
+                  "min": -360,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 5,
+                  "max": 15,
+                  "min": 2
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/square.svg",
+                  "mode": "fixed"
+                },
+                "symbolAlign": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "text": {
+                  "field": "",
+                  "fixed": "ME",
+                  "mode": "field"
+                },
+                "textConfig": {
+                  "fontSize": 12,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "point"
+            },
+            "location": {
+              "mode": "auto"
+            },
+            "name": "Location",
+            "tooltip": true,
+            "type": "markers"
+          },
+          {
+            "config": {
+              "showLegend": true,
+              "style": {
+                "color": {
+                  "field": "z_score",
+                  "fixed": "dark-green"
+                },
+                "opacity": 0.8,
+                "rotation": {
+                  "fixed": 0,
+                  "max": 360,
+                  "min": -360,
+                  "mode": "mod"
+                },
+                "size": {
+                  "fixed": 3,
+                  "max": 15,
+                  "min": 2
+                },
+                "symbol": {
+                  "fixed": "img/icons/marker/circle.svg",
+                  "mode": "fixed"
+                },
+                "symbolAlign": {
+                  "horizontal": "center",
+                  "vertical": "center"
+                },
+                "textConfig": {
+                  "fontSize": 12,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "textAlign": "center",
+                  "textBaseline": "middle"
+                }
+              }
+            },
+            "filterData": {
+              "id": "byRefId",
+              "options": "close_stations"
+            },
+            "location": {
+              "mode": "auto"
+            },
+            "name": "Prices stddev from mean",
+            "tooltip": true,
+            "type": "markers"
+          }
+        ],
+        "tooltip": {
+          "mode": "details"
+        },
+        "view": {
+          "allLayers": true,
+          "id": "fit",
+          "lat": 0,
+          "lon": 0,
+          "zoom": 15
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT  \n    (select max(time) from prices) as now_t,\n    $__timeTo()::TIMESTAMP as to_t,\n    (CASE WHEN to_t < now_t THEN to_t ELSE now_t END) as end_t,\n    $__timeFrom()::TIMESTAMP as start_t, \n    '${time_granularity}'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n     $latitude as lat, $longitude as lon, $dst_threshold AS dst_threshold\n),\nclose_enough_stations AS (\n    SELECT s.*\n    FROM param, ( \n        SELECT s.*, 2 * 6371 * ATAN2(\n                SQRT(\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ),\n                SQRT(1 - (\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ))\n            ) AS dst_km\n        FROM stations s\n    ) as s\n    WHERE dst_km <= dst_threshold\n),\nactive_stations AS(\n    SELECT s.id as station_id, s.*\n    FROM param, close_enough_stations s \n   WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN start_t AND end_t)-- avoid inactive stations\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nflextime_buckets AS(\n    SELECT bucket_start, s.station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM time_series, stations_times st, active_stations s\n    WHERE st.station_id = s.station_id  AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, station_id, bucket_start as from_t , bucket_end as to_t\n    FROM time_series, active_stations \n    WHERE always_open AND first_active <= bucket_start\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_prices AS (\n   SELECT time as valid_from, ${fuel:raw} as price, s.*\n    FROM param, prices p, active_stations s\n    WHERE s.station_id = p.station_uuid\n    AND ${fuel:raw}_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.* --add last event before start\n    FROM param, active_stations s, (\n        SELECT time as valid_from, ${fuel:raw} as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND ${fuel:raw}_change IN (1,3)\n        AND time <= start_t AND time >= start_t - '3 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t)\n),\nstations_avg_prices AS (\n    SELECT station_id, brand, city, latitude, longitude, SUM(price * duration_seconds) / SUM(duration_seconds) as st_avg_price,\n    FROM prices_time_series\n    GROUP BY station_id, brand, city, latitude, longitude\n),\nstats AS (\n    SELECT AVG(st_avg_price) AS avg_price, STDDEV(st_avg_price) AS std_dev_price \n    FROM stations_avg_prices\n),\nprices_scores AS (\n    SELECT p.*, (p.st_avg_price - avg_price) / std_dev_price AS z_score\n    FROM stations_avg_prices p, stats\n)\nSELECT * FROM prices_scores;\n",
+          "refId": "close_stations",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "fdl2zuq913klcb"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "select $latitude as latitude, $longitude as longitude;",
+          "refId": "point",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Stations In Local Area ($fuel)",
+      "type": "geomap"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "decimals": 4,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 13,
+        "x": 0,
+        "y": 10
+      },
+      "id": 15,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT  \n    (select max(time) from prices) as now_t,\n    $__timeTo()::TIMESTAMP as to_t,\n    DATE_TRUNC('day',(CASE WHEN to_t < now_t THEN to_t ELSE now_t END)) as end_t,\n    DATE_TRUNC('day', $__timeFrom()::TIMESTAMP)as start_t, \n    '1 day'::INTERVAL AS time_granularity,\n     EXTRACT(EPOCH FROM time_granularity) AS interval_seconds,\n     $latitude as lat, $longitude as lon, $dst_threshold AS dst_threshold\n),\nclose_enough_stations AS (\n    SELECT s.*\n    FROM param, ( \n        SELECT s.*, 2 * 6371 * ATAN2(\n                SQRT(\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ),\n                SQRT(1 - (\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ))\n            ) AS dst_km\n        FROM stations s\n    ) as s\n    WHERE dst_km <= dst_threshold\n),\nactive_stations AS(\n    SELECT s.id as station_id, s.*\n    FROM param, close_enough_stations s \n   WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN start_t AND end_t)-- avoid inactive stations\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nflextime_buckets AS(\n    SELECT bucket_start, s.station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM time_series, stations_times st, active_stations s\n    WHERE st.station_id = s.station_id  AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, station_id, bucket_start as from_t , bucket_end as to_t\n    FROM time_series, active_stations \n    WHERE always_open AND first_active <= bucket_start\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_prices AS (\n   SELECT time as valid_from, ${fuel:raw} as price, s.*\n    FROM param, prices p, active_stations s\n    WHERE s.station_id = p.station_uuid\n    AND ${fuel:raw}_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.* --add last event before start\n    FROM param, active_stations s, (\n        SELECT time as valid_from, ${fuel:raw} as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND ${fuel:raw}_change IN (1,3)\n        AND time <= start_t AND time >= start_t - '3 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t)\n),\naggregation AS (\n    SELECT \n        EXTRACT(dow FROM bucket_start) as dow,\n        CASE WHEN dow=0 THEN 7 ELSE dow END as dow_idx,\n        (ARRAY['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])[dow_idx] as day,\n        SUM(price * duration_seconds) / SUM(duration_seconds) AS avg_price,\n    FROM prices_time_series\n    GROUP BY dow\n)\nSELECT day, avg_price\nFROM aggregation\nORDER BY avg_price;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Ranking Days of The Week by Average Price ($fuel)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg_price"
+            },
+            "properties": []
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "n_stations"
+            },
+            "properties": []
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 11,
+        "x": 13,
+        "y": 15
+      },
+      "id": 13,
+      "options": {
+        "data": [
+          {
+            "marker": {
+              "color": "blue",
+              "opacity": 0.7,
+              "size": 10
+            },
+            "mode": "markers+text",
+            "textposition": "top center",
+            "type": "scatter"
+          }
+        ],
+        "layout": {
+          "showlegend": false,
+          "title": {
+            "text": "Fuel Prices vs. Number of Open Stations"
+          },
+          "xaxis": {
+            "autorange": true,
+            "gridcolor": "#ddd",
+            "range": [
+              1.701448077586808,
+              1.7789187417944021
+            ],
+            "title": {
+              "text": "Average Fuel Price (€)"
+            },
+            "type": "linear"
+          },
+          "yaxis": {
+            "autorange": true,
+            "gridcolor": "#ddd",
+            "range": [
+              -4.994033960532355,
+              88.99403396053235
+            ],
+            "title": {
+              "text": "Number of Open Stations"
+            },
+            "type": "linear"
+          }
+        },
+        "onclick": "console.log(data)\nwindow.updateVariables({query:{'var-project':'test'}, partial: true})",
+        "script": "console.log(data)\nvar trace = {\n  x: data.series[0].fields[2].values,\n  y: data.series[0].fields[1].values,\n  text: data.series[0].fields[0].values\n};\n  \nreturn {data:[trace]};"
+      },
+      "pluginVersion": "0.5.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT  \n    (select max(time) from prices) as now_t,\n    $__timeTo()::TIMESTAMP as to_t,\n    DATE_TRUNC('hour',(CASE WHEN to_t < now_t THEN to_t ELSE now_t END)) as end_t,\n    DATE_TRUNC('hour', $__timeFrom()::TIMESTAMP ) as start_t, \n    '1 day'::INTERVAL AS time_granularity,\n\n    $latitude as lat, $longitude as lon, $dst_threshold AS dst_threshold,\n    EXTRACT(EPOCH FROM time_granularity) AS interval_seconds\n),\nclose_enough_stations AS (\n    SELECT s.*\n    FROM param, ( \n        SELECT s.*, 2 * 6371 * ATAN2(\n                SQRT(\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ),\n                SQRT(1 - (\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ))\n            ) AS dst_km\n        FROM stations s\n    ) as s\n    WHERE dst_km <= dst_threshold\n),\nactive_stations AS(\n    SELECT s.id as station_id, s.*\n    FROM param, close_enough_stations s \n   WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN start_t AND end_t)-- avoid inactive stations\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nflextime_buckets AS(\n    SELECT bucket_start, s.station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM time_series, stations_times st, active_stations s\n    WHERE st.station_id = s.station_id  AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, station_id, bucket_start as from_t , bucket_end as to_t\n    FROM time_series, active_stations \n    WHERE always_open AND first_active <= bucket_start\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_prices AS (\n   SELECT time as valid_from, ${fuel:raw} as price, s.*\n    FROM param, prices p, active_stations s\n    WHERE s.station_id = p.station_uuid\n    AND ${fuel:raw}_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.* --add last event before start\n    FROM param, active_stations s, (\n        SELECT time as valid_from, ${fuel:raw} as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND ${fuel:raw}_change IN (1,3)\n        AND time <= start_t AND time >= start_t - '3 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t)\n)\nSELECT brand, COUNT(DISTINCT station_id) n_stations, SUM(price * duration_seconds) / SUM(duration_seconds) as avg_${fuel:raw}_price, ,\nFROM prices_time_series\nWHERE brand <> ''\nGROUP BY brand \nORDER BY n_stations DESC, avg_${fuel:raw}_price ASC LIMIT 15;",
+          "refId": "stations count",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Top Brands In The Area ($fuel)",
+      "type": "ae3e-plotly-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "fdl2zuq913klcb"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 13,
+        "x": 0,
+        "y": 18
+      },
+      "id": 16,
+      "interval": "$time_granularity",
+      "options": {
+        "data": [
+          {
+            "marker": {
+              "color": "blue",
+              "opacity": 0.7,
+              "size": 5
+            },
+            "mode": "lines+markers",
+            "textposition": "top center",
+            "type": "scatter"
+          }
+        ],
+        "layout": {
+          "showlegend": false,
+          "title": {
+            "text": "Price Over Day-Hours of the Week"
+          },
+          "xaxis": {
+            "autorange": true,
+            "gridcolor": "#ddd",
+            "range": [
+              -9.817811408614668,
+              176.81781140861466
+            ],
+            "title": {
+              "text": "Day and Hour"
+            },
+            "type": "linear"
+          },
+          "yaxis": {
+            "autorange": true,
+            "gridcolor": "#ddd",
+            "title": {
+              "text": "Average Fuel Price (€)"
+            },
+            "type": "linear"
+          }
+        },
+        "onclick": "console.log(data)\nwindow.updateVariables({query:{'var-project':'test'}, partial: true})",
+        "script": "console.log(data.series[0].fields[2].values);\n\nvar trace = {\n  x: data.series[0].fields[0].values,  // day_hour_idx for continuous x-axis\n  y: data.series[0].fields[1].values,  // avg_price for y-axis\n  text: data.series[0].fields[2].values,  // day_hour for readable labels\n};\n\nvar layout = {\n  showlegend: false,\n  title: {\n    text: \"Price Over Day-Hours of the Week\"\n  },\n  xaxis: {\n    autorange: true,\n    gridcolor: \"#ddd\",\n    title: {\n      text: \"Day and Hour\"\n    },\n    tickmode: \"array\",\n    tickvals: data.series[0].fields[0].values.filter((_, i) => data.series[0].fields[2].values[i].endsWith(\"00\")),\n    ticktext: data.series[0].fields[2].values.filter(label => label.endsWith(\"00\")).map(label => label.split(\" \")[0]),\n    tickson: \"boundaries\",\n    ticklen: 5,\n    ticklabelposition: \"inside right\",\n  },\n  yaxis: {\n    autorange: true,\n    gridcolor: \"#ddd\",\n    title: {\n      text: \"Average Fuel Price (€)\"\n    },\n    \"type\": \"linear\"\n  }\n};\n\n\nreturn {data:[trace], layout: layout};\n"
+      },
+      "pluginVersion": "0.5.0",
+      "targets": [
+        {
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH param AS (\n    SELECT  \n    (select max(time) from prices) as now_t,\n    $__timeTo()::TIMESTAMP as to_t,\n    DATE_TRUNC('hour',(CASE WHEN to_t < now_t THEN to_t ELSE now_t END)) as end_t,\n    DATE_TRUNC('hour', $__timeFrom()::TIMESTAMP ) as start_t, \n    '1 hour'::INTERVAL AS time_granularity,\n\n    $latitude as lat, $longitude as lon, $dst_threshold AS dst_threshold,\n    EXTRACT(EPOCH FROM time_granularity) AS interval_seconds\n),\nclose_enough_stations AS (\n    SELECT s.*\n    FROM param, ( \n        SELECT s.*, 2 * 6371 * ATAN2(\n                SQRT(\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ),\n                SQRT(1 - (\n                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +\n                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *\n                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)\n                ))\n            ) AS dst_km\n        FROM stations s\n    ) as s\n    WHERE dst_km <= dst_threshold\n),\nactive_stations AS(\n    SELECT s.id as station_id, s.*\n    FROM param, close_enough_stations s \n   WHERE EXISTS (SELECT station_uuid from prices p where p.station_uuid = s.id AND p.time BETWEEN start_t AND end_t)-- avoid inactive stations\n),\ntime_series AS (\n    SELECT  start_t + (((i-1) * interval_seconds) * INTERVAL '1 second') AS bucket_start, \n            bucket_start + (interval_seconds * INTERVAL '1 second') as bucket_end,\n            (CASE WHEN EXTRACT(dow FROM bucket_start) = 0 THEN 6 ELSE EXTRACT(dow FROM bucket_start) -1 END ) as day_bit,\n    FROM param, generate_series(1 , (EXTRACT(EPOCH FROM (end_t - start_t)) / interval_seconds)) AS i\n),\nflextime_buckets AS(\n    SELECT bucket_start, s.station_id, bucket_start::date + open_time as from_t , bucket_end::date + close_time as to_t\n    FROM time_series, stations_times st, active_stations s\n    WHERE st.station_id = s.station_id  AND first_active <= bucket_start\n        AND (days & (1 << (day_bit))) > 0 -- open day?\n        AND (bucket_start::date + open_time, bucket_start::date + close_time) OVERLAPS (bucket_start, bucket_end) -- opening hours?\n),\nalwaysopen_buckets AS (\n    SELECT bucket_start, station_id, bucket_start as from_t , bucket_end as to_t\n    FROM time_series, active_stations \n    WHERE always_open AND first_active <= bucket_start\n),\nstations_time_series AS (\n    SELECT * FROM  flextime_buckets UNION ALL SELECT * FROM alwaysopen_buckets\n),\nstations_prices AS (\n   SELECT time as valid_from, ${fuel:raw} as price, s.*\n    FROM param, prices p, active_stations s\n    WHERE s.station_id = p.station_uuid\n    AND ${fuel:raw}_change IN (1,3) AND time BETWEEN param.start_t AND param.end_t\n\n    UNION ALL\n\n    SELECT  param.start_t AS valid_from, price, s.* --add last event before start\n    FROM param, active_stations s, (\n        SELECT time as valid_from, ${fuel:raw} as price\n        FROM prices pp, param\n        WHERE s.station_id = pp.station_uuid AND ${fuel:raw}_change IN (1,3)\n        AND time <= start_t AND time >= start_t - '3 day'::INTERVAL \n        ORDER BY time DESC LIMIT 1\n    ) p\n), \nprices_intervals AS (\n    SELECT LEAD(valid_from, 1, param.end_t) OVER (PARTITION BY station_id ORDER BY valid_from) AS valid_until, sp.*\n    FROM stations_prices sp, param\n),\nprices_time_series AS (\n    SELECT bucket_start, EXTRACT(EPOCH FROM (LEAST(to_t, valid_until) - GREATEST(from_t, valid_from))) as duration_seconds, p_int.*\n    FROM  stations_time_series ts, prices_intervals p_int,\n    WHERE ts.station_id = p_int.station_id AND (valid_from,valid_until) OVERLAPS (from_t, to_t)\n),\naggregation AS (\n    SELECT \n        EXTRACT(dow FROM bucket_start) as dow, \n        EXTRACT(HOUR FROM bucket_start) as hour,\n        CASE WHEN dow=0 THEN 7 ELSE dow END as dow_idx,\n        (ARRAY['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])[dow_idx] as day,\n        \n        SUM(price * duration_seconds) / SUM(duration_seconds) AS avg_price,\n    FROM prices_time_series\n    GROUP BY dow,hour\n)\nSELECT  ((dow_idx - 1) * 24) + hour as day_hour_idx, avg_price, day || ' ' || LPAD(hour::TEXT, 2, '0') as day_hour\nFROM aggregation\nORDER BY day_hour_idx;\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Price Over Week on Average ($fuel)",
+      "type": "ae3e-plotly-panel"
+    }
+  ],
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 40,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "diesel",
+          "value": "diesel"
+        },
+        "description": "",
+        "label": "Fuel",
+        "name": "fuel",
+        "options": [
+          {
+            "selected": true,
+            "text": "diesel",
+            "value": "diesel"
+          },
+          {
+            "selected": false,
+            "text": "e5",
+            "value": "e5"
+          },
+          {
+            "selected": false,
+            "text": "e10",
+            "value": "e10"
+          }
+        ],
+        "query": "diesel, e5, e10",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "52.50383",
+          "value": "52.50383"
+        },
+        "description": "",
+        "label": "Latitude",
+        "name": "latitude",
+        "options": [
+          {
+            "selected": true,
+            "text": "52.50383",
+            "value": "52.50383"
+          }
+        ],
+        "query": "52.50383",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "13.3936",
+          "value": "13.3936"
+        },
+        "description": "",
+        "label": "Longitude",
+        "name": "longitude",
+        "options": [
+          {
+            "selected": true,
+            "text": "13.3936",
+            "value": "13.3936"
+          }
+        ],
+        "query": "13.3936",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "30",
+          "value": "30"
+        },
+        "description": "Maximum search distance from my location in km",
+        "label": "Radius (km)",
+        "name": "dst_threshold",
+        "options": [
+          {
+            "selected": true,
+            "text": "30",
+            "value": "30"
+          }
+        ],
+        "query": "30",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "text": "1d",
+          "value": "1d"
+        },
+        "definition": "select a from (\nselect '1d' as a, 1 as b\nunion all\nselect i  || 'h' as a, i * 2 as b FROM generate_series(1, 23) as i\nunion all\nselect i  || 'd' as a, i * 24 as b FROM generate_series(2, 7) as i\n) order by b;",
+        "description": "",
+        "label": "Time Granularity",
+        "name": "time_granularity",
+        "options": [],
+        "query": "select a from (\nselect '1d' as a, 1 as b\nunion all\nselect i  || 'h' as a, i * 2 as b FROM generate_series(1, 23) as i\nunion all\nselect i  || 'd' as a, i * 24 as b FROM generate_series(2, 7) as i\n) order by b;",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "2024-01-01T00:00:00.000Z",
+    "to": "2024-04-30T23:59:59.000Z"
+  },
+  "timepicker": {
+    "refresh_intervals": []
+  },
+  "timezone": "utc",
+  "title": "Local Fuel Price Trends",
+  "uid": "febkp3afngr28d",
+  "version": 19,
+  "weekStart": "monday"
+}

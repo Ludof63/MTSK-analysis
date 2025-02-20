@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -828,8 +828,8 @@
       },
       {
         "current": {
-          "text": "8670",
-          "value": "8670"
+          "text": "8668",
+          "value": "8668"
         },
         "definition": "select count(DISTINCT station_id) from stations_times;",
         "description": "",
@@ -843,8 +843,8 @@
       },
       {
         "current": {
-          "text": "22649574s",
-          "value": "22649574s"
+          "text": "22869592s",
+          "value": "22869592s"
         },
         "definition": "SELECT EXTRACT(EPOCH FROM (NOW() - MAX(time)))::INT || 's' AS time_difference\nFROM prices;\n",
         "hide": 2,
@@ -857,8 +857,8 @@
       },
       {
         "current": {
-          "text": "2024-06-01 12:05:16",
-          "value": "2024-06-01 12:05:16"
+          "text": "2024-05-31 23:59:38",
+          "value": "2024-05-31 23:59:38"
         },
         "definition": "SELECT FORMAT(MAX(time), 'yyyy-MM-dd HH:mm:ss') AS now_t FROM prices;\n",
         "hide": 2,
@@ -904,8 +904,8 @@
     ]
   },
   "timezone": "utc",
-  "title": "Real-Time",
+  "title": "Real-Time Fuel Prices",
   "uid": "febgp3afngr28c",
-  "version": 7,
+  "version": 2,
   "weekStart": "monday"
 }
