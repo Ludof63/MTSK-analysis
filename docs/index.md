@@ -36,7 +36,9 @@ Our analysis is based on the schema defined in `/sql/schema.sql`, which consists
 There are several important aspects to consider when working with this data:
 
 - A price `p` for a fuel `f` for a certain station `s` is valid until the next update in time for `f` for `s`
-- For a fuel `fuel` I should only consider the price events with `fuel_change IN (1,3)`. 
+- For `fuel`, we should only consider price events where `fuel_change IN (1,3)`, as per the [dataset documentation](https://dev.azure.com/tankerkoenig/_git/tankerkoenig-data?path=/README.md&_a=preview):
+  - `1`: Price change for `fuel`
+  - `3`: New price entry for `fuel`
 - There are 2 types of stations: **Always-Open** and  **Flex-Time** stations. Flex-Time stations have their opening hours recorded in `stations_times`.
 - Some stations in the dataset are inactive. We classify a station as inactive if it hasn’t updated its prices in the last three days (we will discuss how we arrived at this threshold when we will analyze [Update Frequency by Station](#update-frequency-by-station)).
 
@@ -93,7 +95,7 @@ SELECT
 
 Now we can extend the `open_stations`, getting the current price (in this case diesel price) for each station. The "current" price, `curr_price` , is the price set by the *latest update before the current time*:
 
-```postgresql
+```sql
 curr_prices AS (
     SELECT open_stations.*, p.price, p.time
     FROM open_stations, param, (
@@ -243,7 +245,22 @@ Before clustering stations by city area, we need to ask: **what exactly do we de
 1. **Capture large city areas** – We should focus on stations around major cities while excluding those too far away.
 2. **Merge nearby cities** – If multiple cities are close to each other, they should be considered together in the same cluster.
 
-Let's start with the first point, which we can easily express in SQL:
+Let’s start with the [Haversine formula](https://en.wikipedia.org/wiki/Haversine_formula), which provides a good approximation of the distance between two points on a sphere. While Earth isn't a perfect sphere, this method is accurate for our goals. Writing it in SQL can be tricky, but an LLM makes it effortless. For example, to compute the distance (in km) between the city centers of Berlin (**BER**) and Munich (**MUC**), an LLM would generate:
+
+```sql
+SELECT 
+    6371 * 
+    ACOS(
+        COS(RADIANS(BER.lat)) * COS(RADIANS(MUC.lat)) * 
+        COS(RADIANS(MUC.lon) - RADIANS(BER.lon)) + 
+        SIN(RADIANS(BER.lat)) * SIN(RADIANS(MUC.lat))
+    ) AS distance_km
+FROM 
+    (SELECT 52.520 AS lat, 13.405 AS lon) AS BER,  
+    (SELECT 48.135 AS lat, 11.582 AS lon) AS MUC;
+```
+
+This gives us a close enough approximation—`504.42 km` instead of the [more precise](https://gps-coordinates.org/distance-between-coordinates.php) `504.43 km`. Now, we can use it to get the first requirement:
 
 ```sql
 WITH RECURSIVE param AS (
