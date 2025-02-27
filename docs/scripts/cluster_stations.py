@@ -6,6 +6,7 @@ import folium, random
 
 
 DO_PLOT = True
+QUERY_CREATE_DST= "../sql/clustering/HaversineDst.sql"
 
 OUTPUT_PARTIAL="stations_clusters_partial.html"
 QUERY_PARTIAL="../sql/clustering/PartialCluster.sql"
@@ -77,6 +78,9 @@ def main():
     args = parser.parse_args()
 
     os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+    print(f"Executing: {QUERY_CREATE_DST}")
+    execute_statement(read_query(QUERY_CREATE_DST))
 
     query_file = QUERY_PARTIAL if args.partial else QUERY_COMPLETE
     print(f"Executing: {query_file}")

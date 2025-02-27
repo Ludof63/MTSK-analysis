@@ -13,18 +13,7 @@ WITH param AS (
 close_enough_stations AS (
     SELECT s.*
     FROM param, ( 
-        SELECT s.*, 2 * 6371 * ATAN2(
-                SQRT(
-                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
-                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
-                ),
-                SQRT(1 - (
-                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
-                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
-                ))
-            ) AS dst_km
+        SELECT s.*, haversine_dst(lat, lon, s.latitude, s.longitude) as dst_km
         FROM stations s
     ) as s
     WHERE dst_km <= dst_threshold

@@ -245,16 +245,20 @@ Before clustering stations by city area, we need to ask: **what exactly do we de
 1. **Capture large city areas** – We should focus on stations around major cities while excluding those too far away.
 2. **Merge nearby cities** – If multiple cities are close to each other, they should be considered together in the same cluster.
 
-Let’s start with the [Haversine formula](https://en.wikipedia.org/wiki/Haversine_formula), which provides a good approximation of the distance between two points on a sphere. While Earth isn't a perfect sphere, this method is accurate for our goals. Writing it in SQL can be tricky, but an LLM makes it effortless. For example, to compute the distance (in km) between the city centers of Berlin (**BER**) and Munich (**MUC**), an LLM would generate:
+Let’s start with the [Haversine formula](https://en.wikipedia.org/wiki/Haversine_formula), which provides a good approximation of the distance between two points on a sphere. While Earth isn't a perfect sphere, this method is accurate for our goals. Writing it in SQL can be tricky, but an LLM makes it effortless. We can define it as a [user defined function](https://cedardb.com/docs/references/sqlreference/statements/createfunction/):
 
 ```sql
-SELECT 
-    6371 * 
-    ACOS(
-        COS(RADIANS(BER.lat)) * COS(RADIANS(MUC.lat)) * 
-        COS(RADIANS(MUC.lon) - RADIANS(BER.lon)) + 
-        SIN(RADIANS(BER.lat)) * SIN(RADIANS(MUC.lat))
-    ) AS distance_km
+CREATE FUNCTION 
+    haversine_dst(lat1 double precision, lon1 double precision, 
+                  lat2 double precision, lon2 double precision)
+    returns double precision language sql AS 
+    '6371 * ACOS(COS(RADIANS(lat2)) * COS(RADIANS(lat1)) * COS(RADIANS(lon1) - RADIANS(lon2)) + SIN(RADIANS(lat2)) * SIN(RADIANS(lat1)))';
+```
+
+ For example, to compute the distance (in km) between the city centers of Berlin (**BER**) and Munich (**MUC**):
+
+```sql
+SELECT dst(BER.lat, BER.lon, MUC.lat, MUC.lon) as dst_km
 FROM 
     (SELECT 52.520 AS lat, 13.405 AS lon) AS BER,  
     (SELECT 48.135 AS lat, 11.582 AS lon) AS MUC;
@@ -263,7 +267,7 @@ FROM
 This gives us a close enough approximation—`504.42 km` instead of the [more precise](https://gps-coordinates.org/distance-between-coordinates.php) `504.43 km`. Now, we can use it to get the first requirement:
 
 ```sql
-WITH RECURSIVE param AS (
+WITH param AS (
     SELECT 30 AS dst_threshold
 ),
 top_cities AS ( --start from the top cities
@@ -275,19 +279,7 @@ clusters AS ( --assign a station to the closest top_city
     FROM (
         SELECT station_id, leader, ROW_NUMBER() OVER (PARTITION BY station_id ORDER BY distance_km ASC) AS rn
         FROM param, (
-            SELECT s.id AS station_id, tc.city AS leader,
-            2 * 6371 * ATAN2(
-                SQRT(
-                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *
-                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)
-                ),
-                SQRT(1 - (
-                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *
-                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)
-                ))
-            ) AS distance_km
+            SELECT s.id AS station_id, tc.city AS leader, haversine_dst(tc.lat, tc.lon, s.latitude, s.longitude) as distance_km
             FROM stations s, param, top_cities tc)
         WHERE distance_km <= dst_threshold
     )
@@ -319,19 +311,7 @@ rec_clusters AS ( --merge close enough clusters togheter
     FROM param, rec_clusters rc, (
         SELECT leader_a, leader_b, size_a, size_b
         FROM (
-            SELECT leader_a, leader_b, size_a, size_b,
-                    2 * 6371 * ATAN2(
-                    SQRT(
-                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +
-                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *
-                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)
-                    ),
-                    SQRT(1 - (
-                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +
-                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *
-                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)
-                    ))
-                ) as distance_km
+            SELECT leader_a, leader_b, size_a, size_b, haversine_dst(tc1.lat, tc1.lon, tc2.lat, tc2.lon) as distance_km
             FROM (
                 SELECT cluster as leader_a, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_a
                 FROM rec_clusters, stations WHERE station_id = id
@@ -706,24 +686,13 @@ WITH param AS (
 ),..
 ```
 
-and then we can first filter those stations close enough to our location and then additionally filter out inactive stations:
+and then we can first filter those stations close enough to our location (using the user defined function we created [before](#clustering-stations-by-city-area), `haversine_dst`) and then additionally filter out inactive stations:
 
 ```sql
 close_enough_stations AS (
     SELECT s.*
     FROM param, ( 
-        SELECT s.*, 2 * 6371 * ATAN2(
-                SQRT(
-                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
-                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
-                ),
-                SQRT(1 - (
-                    POWER(SIN(RADIANS(lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(lat)) *
-                    POWER(SIN(RADIANS(lon - s.longitude) / 2), 2)
-                ))
-            ) AS dst_km
+        SELECT s.*, haversine_dst(lat, lon, s.latitude, s.longitude) as dst_km
         FROM stations s
     ) as s
     WHERE dst_km <= dst_threshold
@@ -737,7 +706,7 @@ active_stations AS(
 
 In our earlier analysis, we explored nationwide fuel price trends over time, revealing clear patterns—prices tend to rise at night and on weekends. Now, shifting our focus to a local area, we can test whether these trends hold true. By aggregating prices by day of the week and hour, we can determine the best times to fuel up locally.
 
-##### Best Time to Fuel Up in Your Area
+##### Best Time to Fuel Up in Your Area During the Week
 
 To do this, we use the query for the time-weighted average, filter for stations in our selected area, and aggregate the data by day and hour using the `prices_time_series` CTE. This allows us to pinpoint the most cost-effective times to fill up.
 

@@ -13,19 +13,7 @@ clusters AS ( --assign a station to the closest top_city
     FROM (
         SELECT station_id, leader, ROW_NUMBER() OVER (PARTITION BY station_id ORDER BY distance_km ASC) AS rn
         FROM param, (
-            SELECT s.id AS station_id, tc.city AS leader,
-            2 * 6371 * ATAN2(
-                SQRT(
-                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *
-                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)
-                ),
-                SQRT(1 - (
-                    POWER(SIN(RADIANS(tc.lat - s.latitude) / 2), 2) +
-                    COS(RADIANS(s.latitude)) * COS(RADIANS(tc.lat)) *
-                    POWER(SIN(RADIANS(tc.lon - s.longitude) / 2), 2)
-                ))
-            ) AS distance_km
+            SELECT s.id AS station_id, tc.city AS leader, haversine_dst(tc.lat, tc.lon, s.latitude, s.longitude) as distance_km
             FROM stations s, param, top_cities tc)
         WHERE distance_km <= dst_threshold
     )
@@ -39,19 +27,7 @@ rec_clusters AS ( --merge close enough clusters togheter
     FROM param, rec_clusters rc, (
         SELECT leader_a, leader_b, size_a, size_b
         FROM (
-            SELECT leader_a, leader_b, size_a, size_b,
-                    2 * 6371 * ATAN2(
-                    SQRT(
-                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +
-                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *
-                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)
-                    ),
-                    SQRT(1 - (
-                        POWER(SIN(RADIANS(tc1.lat - tc2.lat) / 2), 2) +
-                        COS(RADIANS(tc2.lat)) * COS(RADIANS(tc1.lat)) *
-                        POWER(SIN(RADIANS(tc1.lon - tc2.lon) / 2), 2)
-                    ))
-                ) as distance_km
+            SELECT leader_a, leader_b, size_a, size_b, haversine_dst(tc1.lat, tc1.lon, tc2.lat, tc2.lon) as distance_km
             FROM (
                 SELECT cluster as leader_a, AVG(latitude) AS lat, AVG(longitude) AS lon, COUNT(*) as size_a
                 FROM rec_clusters, stations WHERE station_id = id
